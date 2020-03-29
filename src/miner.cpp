@@ -110,10 +110,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     LOCK2(cs_main, mempool.cs);
     // in fact, this may be redundant cause it was checked upthere in the miner
-    auto myIDs = pmasternodesview->AmIOperator();
+    auto myIDs = penhancedview->AmIOperator();
     if (!myIDs)
         return nullptr;
-    auto nodePtr = pmasternodesview->ExistMasternode(myIDs->id);
+    auto nodePtr = penhancedview->ExistMasternode(myIDs->id);
     if (!nodePtr || !nodePtr->IsActive())
         return nullptr;
 
@@ -145,7 +145,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     // transaction (which in most cases can be a no-op).
     fIncludeWitness = IsWitnessEnabled(pindexPrev, chainparams.GetConsensus());
 
-    auto currentTeam = pmasternodesview->GetCurrentTeam();
+    auto currentTeam = penhancedview->GetCurrentTeam();
     auto confirms = panchorAwaitingConfirms->GetQuorumFor(currentTeam);
     if (confirms.size() > 0) { // quorum or zero
 
@@ -157,7 +157,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         CTxDestination destination = confirm.rewardKeyType == 1 ? CTxDestination(PKHash(confirm.rewardKeyID)) : CTxDestination(WitnessV0KeyHash(confirm.rewardKeyID));
 
         CDataStream metadata(DfAnchorFinalizeTxMarker, SER_NETWORK, PROTOCOL_VERSION);
-        auto nextTeam = pmasternodesview->CalcNextTeam(pindexPrev->stakeModifier);
+        auto nextTeam = penhancedview->CalcNextTeam(pindexPrev->stakeModifier);
         metadata
             << confirm.btcTxHash
             << confirm.anchorHeight
@@ -190,13 +190,13 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     CTransactionRef criminalTx = nullptr;
     if (fCriminals) {
-        CMasternodesView::CMnCriminals criminals = pmasternodesview->GetUnpunishedCriminals();
+        CEnhancedCSView::CMnCriminals criminals = penhancedview->GetUnpunishedCriminals();
         if (criminals.size() != 0) {
-            CMasternodesView::CMnCriminals::iterator itCriminalMN = criminals.begin();
+            CEnhancedCSView::CMnCriminals::iterator itCriminalMN = criminals.begin();
             auto const & proof = itCriminalMN->second;
             CKeyID key;
-            assert(pmasternodesview->IsDoubleSigned(proof.blockHeader, proof.conflictBlockHeader, key));
-            auto itFirstMN = pmasternodesview->ExistMasternode(CMasternodesView::AuthIndex::ByOperator, key);
+            assert(penhancedview->IsDoubleSigned(proof.blockHeader, proof.conflictBlockHeader, key));
+            auto itFirstMN = penhancedview->ExistMasternode(CEnhancedCSView::AuthIndex::ByOperator, key);
             assert(itFirstMN && (*itFirstMN)->second == itCriminalMN->first);
 
             CDataStream metadata(DfCriminalTxMarker, SER_NETWORK, PROTOCOL_VERSION);
@@ -238,13 +238,13 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     // Pinch off foundation share
     CAmount foundationsReward = coinbaseTx.vout[0].nValue * chainparams.GetConsensus().foundationShare / 100;
     if (IsValidDestination(chainparams.GetConsensus().foundationAddress) && chainparams.GetConsensus().foundationShare != 0) {
-        if (pmasternodesview->GetFoundationsDebt() < foundationsReward) {
+        if (penhancedview->GetFoundationsDebt() < foundationsReward) {
             coinbaseTx.vout.resize(2);
             coinbaseTx.vout[1].scriptPubKey = GetScriptForDestination(chainparams.GetConsensus().foundationAddress);
-            coinbaseTx.vout[1].nValue = foundationsReward - pmasternodesview->GetFoundationsDebt();
+            coinbaseTx.vout[1].nValue = foundationsReward - penhancedview->GetFoundationsDebt();
             coinbaseTx.vout[0].nValue -= coinbaseTx.vout[1].nValue;
         } else {
-            pmasternodesview->SetFoundationsDebt(pmasternodesview->GetFoundationsDebt() - foundationsReward);
+            penhancedview->SetFoundationsDebt(penhancedview->GetFoundationsDebt() - foundationsReward);
         }
 
     }
@@ -581,7 +581,7 @@ namespace pos {
         uint32_t mintedBlocks(0);
         {
             LOCK(cs_main);
-            auto nodePtr = pmasternodesview->ExistMasternode(args.masternodeID);
+            auto nodePtr = penhancedview->ExistMasternode(args.masternodeID);
             if (!nodePtr || !nodePtr->IsActive(tip->height)) /// @todo miner: height+1 or nHeight+1 ???
             {
                 /// @todo may be new status for not activated (or already resigned) MN??
@@ -595,7 +595,7 @@ namespace pos {
                 std::map <uint256, CBlockHeader> blockHeaders{};
                 {
                     LOCK(cs_main);
-                    pmasternodesview->FetchMintedHeaders(args.masternodeID, mintedBlocks + 1, blockHeaders, fIsFakeNet);
+                    penhancedview->FetchMintedHeaders(args.masternodeID, mintedBlocks + 1, blockHeaders, fIsFakeNet);
                 }
                 for (std::pair <uint256, CBlockHeader> const & blockHeader : blockHeaders) {
                     if (IsDoubleSignRestricted(blockHeader.second.height, tip->nHeight + (uint64_t)1)) {

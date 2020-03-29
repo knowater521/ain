@@ -188,7 +188,7 @@ static UniValue generatetoaddress(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Error: Invalid address");
     }
 
-    auto myIDs = pmasternodesview->AmIOperator();
+    auto myIDs = penhancedview->AmIOperator();
     if (!myIDs) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Error: I am not masternode operator");
     }
@@ -247,12 +247,12 @@ static UniValue getmintinginfo(const JSONRPCRequest& request)
     if (BlockAssembler::m_last_block_num_txs) obj.pushKV("currentblocktx", *BlockAssembler::m_last_block_num_txs);
     obj.pushKV("difficulty",       (double)GetDifficulty(::ChainActive().Tip()));
 
-    auto mnIds = pmasternodesview->AmIOperator();
+    auto mnIds = penhancedview->AmIOperator();
     obj.pushKV("isoperator",       (bool) mnIds);
     if (mnIds) {
         obj.pushKV("masternodeid", mnIds->id.GetHex());
         obj.pushKV("masternodeoperator", mnIds->operatorAuthAddress.GetHex());
-        CMasternode const & node = *pmasternodesview->ExistMasternode(mnIds->id);
+        CMasternode const & node = *penhancedview->ExistMasternode(mnIds->id);
         auto state = node.GetState();
         obj.pushKV("masternodestate", CMasternode::GetHumanReadableState(state));
         obj.pushKV("generate", node.IsActive() && gArgs.GetBoolArg("-gen", DEFAULT_GENERATE));

@@ -74,18 +74,18 @@ struct DBMNBlockedCriminalCoins
     }
 };
 
-CMasternodesViewDB::CMasternodesViewDB(size_t nCacheSize, bool fMemory, bool fWipe)
+CEnhancedCSViewDB::CEnhancedCSViewDB(size_t nCacheSize, bool fMemory, bool fWipe)
     : db(new CDBWrapper(GetDataDir() / "masternodes", nCacheSize, fMemory, fWipe))
 {
 }
 
 // for test purposes only
-CMasternodesViewDB::CMasternodesViewDB()
+CEnhancedCSViewDB::CEnhancedCSViewDB()
     : db(nullptr)
 {
 }
 
-void CMasternodesViewDB::CommitBatch()
+void CEnhancedCSViewDB::CommitBatch()
 {
     if (batch)
     {
@@ -94,7 +94,7 @@ void CMasternodesViewDB::CommitBatch()
     }
 }
 
-bool CMasternodesViewDB::ReadHeight(int & h)
+bool CEnhancedCSViewDB::ReadHeight(int & h)
 {
     // it's a hack, cause we don't know active chain tip at the loading time
     if (!db->Read(DB_MN_HEIGHT, h))
@@ -104,22 +104,22 @@ bool CMasternodesViewDB::ReadHeight(int & h)
     return true;
 }
 
-void CMasternodesViewDB::WriteHeight(int h)
+void CEnhancedCSViewDB::WriteHeight(int h)
 {
     BatchWrite(DB_MN_HEIGHT, h);
 }
 
-void CMasternodesViewDB::WriteMasternode(uint256 const & txid, CMasternode const & node)
+void CEnhancedCSViewDB::WriteMasternode(uint256 const & txid, CMasternode const & node)
 {
     BatchWrite(make_pair(DB_MASTERNODES, txid), node);
 }
 
-void CMasternodesViewDB::EraseMasternode(uint256 const & txid)
+void CEnhancedCSViewDB::EraseMasternode(uint256 const & txid)
 {
     BatchErase(make_pair(DB_MASTERNODES, txid));
 }
 
-void CMasternodesViewDB::WriteMintedBlockHeader(uint256 const & txid, uint64_t const mintedBlocks, uint256 const & hash, CBlockHeader const & blockHeader, bool fIsFakeNet)
+void CEnhancedCSViewDB::WriteMintedBlockHeader(uint256 const & txid, uint64_t const mintedBlocks, uint256 const & hash, CBlockHeader const & blockHeader, bool fIsFakeNet)
 {
     if (fIsFakeNet) {
         return;
@@ -128,7 +128,7 @@ void CMasternodesViewDB::WriteMintedBlockHeader(uint256 const & txid, uint64_t c
     db->Write(DBMNBlockHeadersKey{DB_MN_BLOCK_HEADERS, DBMNBlockHeadersSearchKey{txid, mintedBlocks}, hash}, blockHeader);
 }
 
-bool CMasternodesViewDB::FetchMintedHeaders(uint256 const & txid, uint64_t const mintedBlocks, std::map<uint256, CBlockHeader> & blockHeaders, bool fIsFakeNet)
+bool CEnhancedCSViewDB::FetchMintedHeaders(uint256 const & txid, uint64_t const mintedBlocks, std::map<uint256, CBlockHeader> & blockHeaders, bool fIsFakeNet)
 {
     if (fIsFakeNet) {
         return false;
@@ -164,25 +164,25 @@ bool CMasternodesViewDB::FetchMintedHeaders(uint256 const & txid, uint64_t const
     return true;
 }
 
-void CMasternodesViewDB::EraseMintedBlockHeader(uint256 const & txid, uint64_t const mintedBlocks, uint256 const & hash)
+void CEnhancedCSViewDB::EraseMintedBlockHeader(uint256 const & txid, uint64_t const mintedBlocks, uint256 const & hash)
 {
     // directly!
     db->Erase(DBMNBlockHeadersKey{DB_MN_BLOCK_HEADERS, DBMNBlockHeadersSearchKey{txid, mintedBlocks}, hash});
 }
 
-void CMasternodesViewDB::WriteCriminal(uint256 const & mnId, CDoubleSignFact const & doubleSignFact)
+void CEnhancedCSViewDB::WriteCriminal(uint256 const & mnId, CDoubleSignFact const & doubleSignFact)
 {
     // directly!
     db->Write(make_pair(DB_MN_CRIMINALS, mnId), doubleSignFact);
 }
 
-void CMasternodesViewDB::EraseCriminal(uint256 const & mnId)
+void CEnhancedCSViewDB::EraseCriminal(uint256 const & mnId)
 {
     // directly!
     db->Erase(make_pair(DB_MN_CRIMINALS, mnId));
 }
 
-void CMasternodesViewDB::WriteCurrentTeam(std::set<CKeyID> const & currentTeam)
+void CEnhancedCSViewDB::WriteCurrentTeam(std::set<CKeyID> const & currentTeam)
 {
     uint32_t i = 0;
     for (std::set<CKeyID>::iterator it = currentTeam.begin(); it != currentTeam.end(); ++it) {
@@ -190,7 +190,7 @@ void CMasternodesViewDB::WriteCurrentTeam(std::set<CKeyID> const & currentTeam)
     }
 }
 
-bool CMasternodesViewDB::LoadCurrentTeam(std::set<CKeyID> & newTeam)
+bool CEnhancedCSViewDB::LoadCurrentTeam(std::set<CKeyID> & newTeam)
 {
     boost::scoped_ptr<CDBIterator> pcursor(const_cast<CDBWrapper*>(&*db)->NewIterator());
     pcursor->Seek(DB_MN_CURRENT_TEAM);
@@ -214,7 +214,7 @@ bool CMasternodesViewDB::LoadCurrentTeam(std::set<CKeyID> & newTeam)
     return true;
 }
 
-bool CMasternodesViewDB::EraseCurrentTeam()
+bool CEnhancedCSViewDB::EraseCurrentTeam()
 {
     boost::scoped_ptr<CDBIterator> pcursor(const_cast<CDBWrapper*>(&*db)->NewIterator());
     pcursor->Seek(DB_MN_CURRENT_TEAM);
@@ -243,22 +243,22 @@ bool CMasternodesViewDB::EraseCurrentTeam()
     return true;
 }
 
-void CMasternodesViewDB::WriteAnchorReward(uint256 const & anchorHash, uint256 const & rewardTxHash)
+void CEnhancedCSViewDB::WriteAnchorReward(uint256 const & anchorHash, uint256 const & rewardTxHash)
 {
     BatchWrite(make_pair(DB_MN_ANCHOR_REWARD, anchorHash), rewardTxHash);
 }
 
-void CMasternodesViewDB::EraseAnchorReward(uint256 const & anchorHash)
+void CEnhancedCSViewDB::EraseAnchorReward(uint256 const & anchorHash)
 {
     BatchErase(make_pair(DB_MN_ANCHOR_REWARD, anchorHash));
 }
 
-void CMasternodesViewDB::WriteFoundationsDebt(CAmount const foundationsDebt)
+void CEnhancedCSViewDB::WriteFoundationsDebt(CAmount const foundationsDebt)
 {
     BatchWrite(DB_MN_FOUNDERS_DEBT, foundationsDebt);
 }
 
-bool CMasternodesViewDB::LoadFoundationsDebt()
+bool CEnhancedCSViewDB::LoadFoundationsDebt()
 {
     foundationsDebt = 0;
     boost::scoped_ptr<CDBIterator> pcursor(const_cast<CDBWrapper*>(&*db)->NewIterator());
@@ -274,22 +274,22 @@ bool CMasternodesViewDB::LoadFoundationsDebt()
     return true;
 }
 
-//void CMasternodesViewDB::WriteDeadIndex(int height, uint256 const & txid, char type)
+//void CEnhancedCSViewDB::WriteDeadIndex(int height, uint256 const & txid, char type)
 //{
 //    BatchWrite(make_pair(make_pair(DB_PRUNEDEAD, static_cast<int32_t>(height)), txid), type);
 //}
 
-//void CMasternodesViewDB::EraseDeadIndex(int height, uint256 const & txid)
+//void CEnhancedCSViewDB::EraseDeadIndex(int height, uint256 const & txid)
 //{
 //    BatchErase(make_pair(make_pair(DB_PRUNEDEAD, static_cast<int32_t>(height)), txid));
 //}
 
-void CMasternodesViewDB::WriteUndo(int height, CMnTxsUndo const & undo)
+void CEnhancedCSViewDB::WriteUndo(int height, CMnTxsUndo const & undo)
 {
     BatchWrite(make_pair(DB_MASTERNODESUNDO, static_cast<int32_t>(height)), undo);
 }
 
-void CMasternodesViewDB::EraseUndo(int height)
+void CEnhancedCSViewDB::EraseUndo(int height)
 {
     BatchErase(make_pair(DB_MASTERNODESUNDO, static_cast<int32_t>(height)));
 }
@@ -297,7 +297,7 @@ void CMasternodesViewDB::EraseUndo(int height)
 /*
  * Loads all data from DB, creates indexes
  */
-bool CMasternodesViewDB::Load()
+bool CEnhancedCSViewDB::Load()
 {
     Clear();
 
@@ -322,7 +322,7 @@ bool CMasternodesViewDB::Load()
     return result;
 }
 
-bool CMasternodesViewDB::Flush()
+bool CEnhancedCSViewDB::Flush()
 {
     batch.reset();
 

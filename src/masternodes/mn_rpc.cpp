@@ -199,13 +199,13 @@ UniValue createmasternode(const JSONRPCRequest& request)
     {
         auto locked_chain = pwallet->chain().lock();
 
-        if (pmasternodesview->ExistMasternode(CMasternodesView::AuthIndex::ByOwner, ownerAuthKey) ||
-            pmasternodesview->ExistMasternode(CMasternodesView::AuthIndex::ByOperator, ownerAuthKey))
+        if (penhancedview->ExistMasternode(CEnhancedCSView::AuthIndex::ByOwner, ownerAuthKey) ||
+            penhancedview->ExistMasternode(CEnhancedCSView::AuthIndex::ByOperator, ownerAuthKey))
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Masternode with collateralAddress == " + collateralAddress + " already exists");
         }
-        if (pmasternodesview->ExistMasternode(CMasternodesView::AuthIndex::ByOwner, operatorAuthKey) ||
-            pmasternodesview->ExistMasternode(CMasternodesView::AuthIndex::ByOperator, operatorAuthKey))
+        if (penhancedview->ExistMasternode(CEnhancedCSView::AuthIndex::ByOwner, operatorAuthKey) ||
+            penhancedview->ExistMasternode(CEnhancedCSView::AuthIndex::ByOperator, operatorAuthKey))
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Masternode with operatorAuthAddress == " + EncodeDestination(operatorDest) + " already exists");
         }
@@ -270,12 +270,12 @@ UniValue resignmasternode(const JSONRPCRequest& request)
     CTxDestination ownerDest;
     {
         auto locked_chain = pwallet->chain().lock();
-        auto optIDs = pmasternodesview->AmIOwner();
+        auto optIDs = penhancedview->AmIOwner();
         if (!optIDs)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("You are not the owner of masternode %s, or it does not exist", nodeIdStr));
         }
-        auto nodePtr = pmasternodesview->ExistMasternode(nodeId);
+        auto nodePtr = penhancedview->ExistMasternode(nodeId);
         if (nodePtr->banHeight != -1)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Masternode %s was criminal, banned at height %i by tx %s", nodeIdStr, nodePtr->banHeight, nodePtr->banTx.GetHex()));
@@ -386,7 +386,7 @@ UniValue listmasternodes(const JSONRPCRequest& request)
     auto locked_chain = pwallet->chain().lock();
 
     UniValue ret(UniValue::VOBJ);
-    CMasternodes const & mns = pmasternodesview->GetMasternodes();
+    CMasternodes const & mns = penhancedview->GetMasternodes();
     if (inputs.empty())
     {
         // Dumps all!
@@ -401,7 +401,7 @@ UniValue listmasternodes(const JSONRPCRequest& request)
         for (size_t idx = 0; idx < inputs.size(); ++idx)
         {
             uint256 id = ParseHashV(inputs[idx], "masternode id");
-            auto const & node = pmasternodesview->ExistMasternode(id);
+            auto const & node = penhancedview->ExistMasternode(id);
             if (node && *node != CMasternode())
             {
                 ret.pushKV(id.GetHex(), verbose ? mnToJSON(*node) : CMasternode::GetHumanReadableState(node->GetState()));
@@ -431,7 +431,7 @@ UniValue listcriminalproofs(const JSONRPCRequest& request)
     auto locked_chain = pwallet->chain().lock();
 
     UniValue ret(UniValue::VOBJ);
-    auto const proofs = pmasternodesview->GetUnpunishedCriminals();
+    auto const proofs = penhancedview->GetUnpunishedCriminals();
     for (auto const & proof : proofs) {
         UniValue obj(UniValue::VOBJ);
         obj.pushKV("hash1", proof.second.blockHeader.GetHash().ToString());
