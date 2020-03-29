@@ -64,7 +64,7 @@ bool HasAuth(CTransaction const & tx, CKeyID const & auth)
     return false;
 }
 
-bool CheckMasternodeTx(CMasternodesViewCache & mnview, CTransaction const & tx, Consensus::Params const & consensusParams, int height, int txn, bool isCheck)
+bool CheckMasternodeTx(CEnhancedCSViewCache & mnview, CTransaction const & tx, Consensus::Params const & consensusParams, int height, int txn, bool isCheck)
 {
     bool result = true;
 
@@ -93,7 +93,7 @@ bool CheckMasternodeTx(CMasternodesViewCache & mnview, CTransaction const & tx, 
  * Checks if given tx is 'txCreateMasternode'. Creates new MN if all checks are passed
  * Issued by: any
  */
-bool CheckCreateMasternodeTx(CMasternodesViewCache & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck)
+bool CheckCreateMasternodeTx(CEnhancedCSViewCache & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck)
 {
     // Check quick conditions first
     if (tx.vout.size() < 2 ||
@@ -116,7 +116,7 @@ bool CheckCreateMasternodeTx(CMasternodesViewCache & mnview, CTransaction const 
     return result;
 }
 
-bool CheckResignMasternodeTx(CMasternodesViewCache & mnview, CTransaction const & tx, int height, int txn, const std::vector<unsigned char> & metadata, bool isCheck)
+bool CheckResignMasternodeTx(CEnhancedCSViewCache & mnview, CTransaction const & tx, int height, int txn, const std::vector<unsigned char> & metadata, bool isCheck)
 {
     uint256 nodeId(metadata);
     auto const node = mnview.ExistMasternode(nodeId);
@@ -141,7 +141,7 @@ bool CheckResignMasternodeTx(CMasternodesViewCache & mnview, CTransaction const 
 /*
  * Checks all inputs for collateral.
  */
-bool CheckInputsForCollateralSpent(CMasternodesViewCache & mnview, CTransaction const & tx, int height, bool isCheck)
+bool CheckInputsForCollateralSpent(CEnhancedCSViewCache & mnview, CTransaction const & tx, int height, bool isCheck)
 {
     bool total(true);
     for (uint32_t i = 0; i < tx.vin.size() && total; ++i)

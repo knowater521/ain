@@ -20,23 +20,23 @@
 class CBlockHeader;
 
 /** Access to the masternodes database (masternodes/) */
-class CMasternodesViewDB : public CMasternodesView
+class CEnhancedCSViewDB : public CEnhancedCSView
 {
 private:
     boost::shared_ptr<CDBWrapper> db;
     boost::scoped_ptr<CDBBatch> batch;
 
 public:
-    CMasternodesViewDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
-    ~CMasternodesViewDB() override {}
+    CEnhancedCSViewDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
+    ~CEnhancedCSViewDB() override {}
 
 protected:
     // for test purposes only
-    CMasternodesViewDB();
+    CEnhancedCSViewDB();
 
 private:
-    CMasternodesViewDB(CMasternodesViewDB const & other) = delete;
-    CMasternodesViewDB & operator=(CMasternodesViewDB const &) = delete;
+    CEnhancedCSViewDB(CEnhancedCSViewDB const & other) = delete;
+    CEnhancedCSViewDB & operator=(CEnhancedCSViewDB const &) = delete;
 
     template <typename K, typename V>
     void BatchWrite(const K& key, const V& value)
