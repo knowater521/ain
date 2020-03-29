@@ -152,10 +152,10 @@ public:
 typedef std::map<uint256, CMasternode> CMasternodes;  // nodeId -> masternode object,
 typedef std::map<CKeyID, uint256> CMasternodesByAuth; // for two indexes, owner->nodeId, operator->nodeId
 
-class CMasternodesViewCache;
-class CMasternodesViewHistory;
+class CEnhancedCSViewCache;
+class CEnhancedCSViewHistory;
 
-class CMasternodesView
+class CEnhancedCSView
 {
     using RewardTxHash = uint256;
     using AnchorTxHash = uint256;
@@ -188,12 +188,12 @@ protected:
 
     CMnBlocksUndo blocksUndo;
 
-    CMasternodesView() : lastHeight(0) {}
+    CEnhancedCSView() : lastHeight(0) {}
 
 public:
-    CMasternodesView & operator=(CMasternodesView const & other) = delete;
+    CEnhancedCSView & operator=(CEnhancedCSView const & other) = delete;
 
-    void ApplyCache(CMasternodesView const * cache);
+    void ApplyCache(CEnhancedCSView const * cache);
     void Clear();
 
     bool IsEmpty() const
@@ -201,7 +201,7 @@ public:
         return allNodes.empty() && nodesByOwner.empty() && nodesByOperator.empty() && blocksUndo.empty();
     }
 
-    virtual ~CMasternodesView() {}
+    virtual ~CEnhancedCSView() {}
 
     void SetLastHeight(int h)
     {
@@ -262,7 +262,7 @@ public:
 
     bool OnMasternodeCreate(uint256 const & nodeId, CMasternode const & node, int txn);
     bool OnMasternodeResign(uint256 const & nodeId, uint256 const & txid, int height, int txn);
-    CMasternodesViewCache OnUndoBlock(int height);
+    CEnhancedCSViewCache OnUndoBlock(int height);
 
     void PruneOlder(int height);
 
@@ -311,19 +311,19 @@ public:
     boost::optional<CMasternodeIDs> AmIOperator() const;
     boost::optional<CMasternodeIDs> AmIOwner() const;
 
-    friend class CMasternodesViewCache;
-    friend class CMasternodesViewHistory;
+    friend class CEnhancedCSViewCache;
+    friend class CEnhancedCSViewHistory;
 };
 
 
-class CMasternodesViewCache : public CMasternodesView
+class CEnhancedCSViewCache : public CEnhancedCSView
 {
 protected:
-    CMasternodesView * base;
+    CEnhancedCSView * base;
 
 public:
-    CMasternodesViewCache(CMasternodesView * other)
-        : CMasternodesView()
+    CEnhancedCSViewCache(CEnhancedCSView * other)
+        : CEnhancedCSView()
         , base(other)
     {
         assert(base);
@@ -333,7 +333,7 @@ public:
         // cached items are empty!
     }
 
-    ~CMasternodesViewCache() override {}
+    ~CEnhancedCSViewCache() override {}
 
     CMasternodes GetMasternodes() const override
     {
@@ -395,21 +395,21 @@ public:
 };
 
 
-class CMasternodesViewHistory : public CMasternodesViewCache
+class CEnhancedCSViewHistory : public CEnhancedCSViewCache
 {
 protected:
-    std::map<int, CMasternodesViewCache> historyDiff;
+    std::map<int, CEnhancedCSViewCache> historyDiff;
 
 public:
-    CMasternodesViewHistory(CMasternodesView * top) : CMasternodesViewCache(top) { assert(top); }
+    CEnhancedCSViewHistory(CEnhancedCSView * top) : CEnhancedCSViewCache(top) { assert(top); }
 
     bool Flush() override { assert(false); } // forbidden!!!
 
-    CMasternodesViewHistory & GetState(int targetHeight);
+    CEnhancedCSViewHistory & GetState(int targetHeight);
 };
 
 /** Global variable that points to the CMasternodeView (should be protected by cs_main) */
-extern std::unique_ptr<CMasternodesView> pmasternodesview;
+extern std::unique_ptr<CEnhancedCSView> penhancedview;
 
 //! Checks if given tx is probably one of custom 'MasternodeTx', returns tx type and serialized metadata in 'data'
 MasternodesTxType GuessMasternodeTxType(CTransaction const & tx, std::vector<unsigned char> & metadata);

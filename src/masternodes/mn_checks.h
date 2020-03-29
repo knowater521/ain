@@ -13,15 +13,15 @@ class CBlock;
 class CTransaction;
 class CTxMemPool;
 
-class CMasternodesView;
-class CMasternodesViewCache;
+class CEnhancedCSView;
+class CEnhancedCSViewCache;
 
-bool CheckMasternodeTx(CMasternodesViewCache & mnview, CTransaction const & tx, const Consensus::Params& consensusParams, int height, int txn, bool isCheck = true);
+bool CheckMasternodeTx(CEnhancedCSViewCache & mnview, CTransaction const & tx, const Consensus::Params& consensusParams, int height, int txn, bool isCheck = true);
 
-bool CheckInputsForCollateralSpent(CMasternodesViewCache & mnview, CTransaction const & tx, int nHeight, bool isCheck);
+bool CheckInputsForCollateralSpent(CEnhancedCSViewCache & mnview, CTransaction const & tx, int nHeight, bool isCheck);
 //! Deep check (and write)
-bool CheckCreateMasternodeTx(CMasternodesViewCache & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck);
-bool CheckResignMasternodeTx(CMasternodesViewCache & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck);
+bool CheckCreateMasternodeTx(CEnhancedCSViewCache & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck);
+bool CheckResignMasternodeTx(CEnhancedCSViewCache & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck);
 
 bool IsMempooledMnCreate(const CTxMemPool& pool, const uint256 & txid);
 
