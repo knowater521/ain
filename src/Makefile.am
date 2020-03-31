@@ -136,6 +136,7 @@ DEFI_CORE_H = \
   core_memusage.h \
   cuckoocache.h \
   flatfile.h \
+  flushablestorage.h \
   fs.h \
   httprpc.h \
   httpserver.h \
