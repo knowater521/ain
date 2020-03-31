@@ -5,7 +5,7 @@
 #include <masternodes/masternodes.h>
 #include <masternodes/anchors.h>
 
-#include <chainparams.h>
+//#include <chainparams.h>
 #include <net_processing.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
@@ -18,6 +18,9 @@
 #include <functional>
 
 std::unique_ptr<CEnhancedCSView> penhancedview;
+
+std::unique_ptr<CStorageLevelDB> penhancedDB;
+std::unique_ptr<CEnhanced123> penhanced123;
 
 static const std::map<char, MasternodesTxType> MasternodesTxTypeToCode =
 {
@@ -474,25 +477,6 @@ void CEnhancedCSView::CreateAndRelayConfirmMessageIfNeed(const CAnchor & anchor,
     }
 }
 
-bool CEnhancedCSView::IsDoubleSigned(CBlockHeader const & oneHeader, CBlockHeader const & twoHeader, CKeyID & minter)
-{
-    // not necessary to check if such masternode exists or active. this is proof by itself!
-    CKeyID firstKey, secondKey;
-    if (!oneHeader.ExtractMinterKey(firstKey) || !twoHeader.ExtractMinterKey(secondKey)) {
-        return false;
-    }
-
-    if (IsDoubleSignRestricted(oneHeader.height, twoHeader.height) &&
-        firstKey == secondKey &&
-        oneHeader.mintedBlocks == twoHeader.mintedBlocks &&
-        oneHeader.GetHash() != twoHeader.GetHash()
-        ) {
-        minter = firstKey;
-        return true;
-    }
-    return false;
-}
-
 void CEnhancedCSView::AddCriminalProof(uint256 const & id, CBlockHeader const & blockHeader, CBlockHeader const & conflictBlockHeader)
 {
     LogPrintf("Add criminal proof for node %s, blocks: %s, %s\n", id.ToString(), blockHeader.GetHash().ToString(), conflictBlockHeader.GetHash().ToString());
@@ -556,7 +540,7 @@ bool CEnhancedCSView::UnbanCriminal(const uint256 txid, std::vector<unsigned cha
     return false;
 }
 
-bool CEnhancedCSView::ExtractCriminalProofFromTx(CTransaction const & tx, std::vector<unsigned char> & metadata)
+bool ExtractCriminalProofFromTx(CTransaction const & tx, std::vector<unsigned char> & metadata)
 {
     if (!tx.IsCoinBase() || tx.vout.size() == 0) {
         return false;
@@ -579,7 +563,7 @@ bool CEnhancedCSView::ExtractCriminalProofFromTx(CTransaction const & tx, std::v
     return true;
 }
 
-bool CEnhancedCSView::ExtractAnchorRewardFromTx(CTransaction const & tx, std::vector<unsigned char> & metadata)
+bool ExtractAnchorRewardFromTx(CTransaction const & tx, std::vector<unsigned char> & metadata)
 {
     if (tx.vout.size() != 2) {
         return false;
@@ -757,4 +741,92 @@ MasternodesTxType GuessMasternodeTxType(CTransaction const & tx, std::vector<uns
 bool IsDoubleSignRestricted(uint64_t height1, uint64_t height2)
 {
     return (std::max(height1, height2) - std::min(height1, height2)) <= DOUBLE_SIGN_MINIMUM_PROOF_INTERVAL;
+}
+
+bool IsDoubleSigned(CBlockHeader const & oneHeader, CBlockHeader const & twoHeader, CKeyID & minter)
+{
+    // not necessary to check if such masternode exists or active. this is proof by itself!
+    CKeyID firstKey, secondKey;
+    if (!oneHeader.ExtractMinterKey(firstKey) || !twoHeader.ExtractMinterKey(secondKey)) {
+        return false;
+    }
+
+    if (IsDoubleSignRestricted(oneHeader.height, twoHeader.height) &&
+        firstKey == secondKey &&
+        oneHeader.mintedBlocks == twoHeader.mintedBlocks &&
+        oneHeader.GetHash() != twoHeader.GetHash()
+        ) {
+        minter = firstKey;
+        return true;
+    }
+    return false;
+}
+
+const unsigned char CMasternodesView::ID      ::prefix = DB_MASTERNODES;
+const unsigned char CMasternodesView::Operator::prefix = DB_MN_OPERATORS;
+const unsigned char CMasternodesView::Owner   ::prefix = DB_MN_OWNERS;
+
+const unsigned char CAnchorRewardsView::BtcTx ::prefix = DB_MN_ANCHOR_REWARD;
+
+CTeamView::CTeam CEnhanced123::CalcNextTeam(const uint256 & stakeModifier)
+{
+    int anchoringTeamSize = Params().GetConsensus().mn.anchoringTeamSize;
+
+    std::map<arith_uint256, CKeyID, std::less<arith_uint256>> priorityMN;
+    ForEachMasternode([&stakeModifier, &priorityMN] (uint256 const & id, CMasternode & node) {
+        if(!node.IsActive())
+            return true;
+
+        CDataStream ss{SER_GETHASH, PROTOCOL_VERSION};
+        ss << id << stakeModifier;
+        priorityMN.insert(std::make_pair(UintToArith256(Hash(ss.begin(), ss.end())), node.operatorAuthAddress));
+        return true;
+    });
+
+    CTeam newTeam;
+    auto && it = priorityMN.begin();
+    for (int i = 0; i < anchoringTeamSize && it != priorityMN.end(); ++i, ++it) {
+        newTeam.insert(it->second);
+    }
+    return newTeam;
+}
+
+/// @todo newbase move to networking?
+void CEnhanced123::CreateAndRelayConfirmMessageIfNeed(const CAnchor & anchor, const uint256 & btcTxHash)
+{
+    auto myIDs = AmIOperator();
+    if (!myIDs || !ExistMasternode(myIDs->second)->IsActive())
+        return ;
+    CKeyID const & operatorAuthAddress = myIDs->first;
+    CTeam const currentTeam = GetCurrentTeam();
+    if (currentTeam.find(operatorAuthAddress) == currentTeam.end()) {
+        LogPrintf("AnchorConfirms::CreateAndRelayConfirmMessageIfNeed: Warning! I am not in a team %s\n", operatorAuthAddress.ToString());
+        return ;
+    }
+
+    std::vector<std::shared_ptr<CWallet>> wallets = GetWallets();
+    CKey masternodeKey{};
+    for (auto const wallet : wallets) {
+        if (wallet->GetKey(operatorAuthAddress, masternodeKey)) {
+            break;
+        }
+        masternodeKey = CKey{};
+    }
+
+    if (!masternodeKey.IsValid()) {
+        LogPrintf("AnchorConfirms::CreateAndRelayConfirmMessageIfNeed: Warning! Masternodes is't valid %s\n", operatorAuthAddress.ToString());
+        // return error("%s: Can't read masternode operator private key", __func__);
+        return ;
+    }
+
+    auto prev = panchors->ExistAnchorByTx(anchor.previousAnchor);
+    auto confirmMessage = CAnchorConfirmMessage::Create(anchor, prev? prev->anchor.height : 0, btcTxHash, masternodeKey);
+    if (panchorAwaitingConfirms->Add(confirmMessage)) {
+        LogPrintf("AnchorConfirms::CreateAndRelayConfirmMessageIfNeed: Create message %s\n", confirmMessage.GetHash().GetHex());
+        RelayAnchorConfirm(confirmMessage.GetHash(), *g_connman);
+    }
+    else {
+        LogPrintf("AnchorConfirms::CreateAndRelayConfirmMessageIfNeed: Warning! not need relay %s because message (or vote!) already exist\n", confirmMessage.GetHash().GetHex());
+    }
+
 }

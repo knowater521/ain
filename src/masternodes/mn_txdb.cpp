@@ -14,16 +14,16 @@
 using namespace std;
 
 // Prefixes to the masternodes database (masternodes/)
-static const char DB_MASTERNODES = 'M';     // main masternodes table
-static const char DB_MASTERNODESUNDO = 'U'; // undo table
-static const char DB_MN_HEIGHT = 'H';       // single record with last processed chain height
-static const char DB_PRUNE_HEIGHT = 'P';    // single record with pruned height (for validation of reachable data window)
+//static const char DB_MASTERNODES = 'M';     // main masternodes table
+//static const char DB_MASTERNODESUNDO = 'U'; // undo table
+//static const char DB_MN_HEIGHT = 'H';       // single record with last processed chain height
+//static const char DB_PRUNE_HEIGHT = 'P';    // single record with pruned height (for validation of reachable data window)
 
-static const char DB_MN_BLOCK_HEADERS = 'h';
-static const char DB_MN_CRIMINALS = 'm';
-static const char DB_MN_ANCHOR_REWARD = 'r';
-static const char DB_MN_CURRENT_TEAM = 't';
-static const char DB_MN_FOUNDERS_DEBT = 'd';
+//static const char DB_MN_BLOCK_HEADERS = 'h';
+//static const char DB_MN_CRIMINALS = 'm';
+//static const char DB_MN_ANCHOR_REWARD = 'r';
+//static const char DB_MN_CURRENT_TEAM = 't';
+//static const char DB_MN_FOUNDERS_DEBT = 'd';
 
 struct DBMNBlockHeadersSearchKey
 {

@@ -1571,6 +1571,11 @@ bool AppInitMain(InitInterfaces& interfaces)
                 penhancedview = MakeUnique<CEnhancedCSViewDB>(nMinDbCache << 20, false, fReset || fReindexChainState);
                 penhancedview->Load();
 
+                penhancedDB = MakeUnique<CStorageLevelDB>(GetDataDir() / "enhancedstate", nMinDbCache << 20, false, fReset || fReindexChainState);
+                penhanced123 = MakeUnique<CEnhanced123>(*penhancedDB.get());
+                auto viewcache = MakeUnique<CEnhanced123>(*penhanced123.get());
+//                penhanced123 = MakeUnique<CEnhanced123>(nMinDbCache << 20, false, fReset || fReindexChainState);
+
                 panchorauths.reset();
                 panchorauths = MakeUnique<CAnchorAuthIndex>();
                 panchorAwaitingConfirms.reset();
