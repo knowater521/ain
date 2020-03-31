@@ -82,7 +82,7 @@ BOOST_AUTO_TEST_CASE(check_doublesign)
     penhancedview->WriteMintedBlockHeader(masternodeID, mintedBlocks, criminalsBlockHeaders[0].GetHash(), criminalsBlockHeaders[0], false);
     penhancedview->WriteMintedBlockHeader(masternodeID, mintedBlocks, criminalsBlockHeaders[1].GetHash(), criminalsBlockHeaders[1], false);
     CKeyID dummy;
-    BOOST_CHECK(penhancedview->IsDoubleSigned(criminalsBlockHeaders[0], criminalsBlockHeaders[1], dummy));
+    BOOST_CHECK(IsDoubleSigned(criminalsBlockHeaders[0], criminalsBlockHeaders[1], dummy));
 
     std::map<uint256, CBlockHeader> blockHeaders;
     BOOST_CHECK(penhancedview->FetchMintedHeaders(masternodeID, mintedBlocks, blockHeaders, false));

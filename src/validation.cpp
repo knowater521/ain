@@ -1554,7 +1554,7 @@ DisconnectResult CChainState::DisconnectBlock(const CBlock& block, const CBlockI
 
         if (is_coinbase) {
             std::vector<unsigned char> metadata;
-            if (CEnhancedCSView::ExtractAnchorRewardFromTx(tx, metadata)) {
+            if (ExtractAnchorRewardFromTx(tx, metadata)) {
                 LogPrintf("AnchorConfirms::DisconnectBlock(): disconnecting finalization tx: %s block: %d\n", tx.GetHash().GetHex(), block.height);
                 CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
                 uint256 btcTxHash;
@@ -1589,7 +1589,7 @@ DisconnectResult CChainState::DisconnectBlock(const CBlock& block, const CBlockI
                 }
 
                 LogPrintf("AnchorConfirms::DisconnectBlock(): disconnected finalization tx: %s block: %d\n", tx.GetHash().GetHex(), block.height);
-            } else if (CEnhancedCSView::ExtractCriminalProofFromTx(tx, metadata)) {
+            } else if (ExtractCriminalProofFromTx(tx, metadata)) {
                 if (mnview.UnbanCriminal(tx.GetHash(), metadata)) {
                     /// @todo criminals: refactor
                     std::pair<CBlockHeader, CBlockHeader> criminal;
@@ -1630,8 +1630,13 @@ DisconnectResult CChainState::DisconnectBlock(const CBlock& block, const CBlockI
             }
             // At this point, all of txundo.vprevout should have been moved out.
         }
+
+        // process transactions revert for masternodes
+        /// @todo newbase
+//        mnview.OnUndoTx(tx);
     }
     // process transactions revert for masternodes
+    /// @todo newbase remove
     mnview.OnUndoBlock(pindex->nHeight);
 
     // move best block pointer to prevout block
@@ -2096,7 +2101,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
             control.Add(vChecks);
         } else {
             std::vector<unsigned char> metadata;
-            if (CEnhancedCSView::ExtractCriminalProofFromTx(tx, metadata)) {
+            if (ExtractCriminalProofFromTx(tx, metadata)) {
                 if (tx.GetValueOut() > 0) {
                     return state.Invalid(ValidationInvalidReason::CONSENSUS,
                                          error("ConnectBlock(): criminal detention pays too much (actual=%d)",
@@ -2113,7 +2118,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
 
                     bannedCriminals.push_back(mnid);
                 }
-            } else if (CEnhancedCSView::ExtractAnchorRewardFromTx(tx, metadata)) {
+            } else if (ExtractAnchorRewardFromTx(tx, metadata)) {
                 LogPrintf("AnchorConfirms::ConnectBlock(): connecting finalization tx: %s block: %d\n", tx.GetHash().GetHex(), block.height);
                 CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
                 uint256 btcTxHash;
