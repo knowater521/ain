@@ -195,7 +195,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
             CEnhancedCSView::CMnCriminals::iterator itCriminalMN = criminals.begin();
             auto const & proof = itCriminalMN->second;
             CKeyID key;
-            assert(penhancedview->IsDoubleSigned(proof.blockHeader, proof.conflictBlockHeader, key));
+            assert(IsDoubleSigned(proof.blockHeader, proof.conflictBlockHeader, key));
             auto itFirstMN = penhancedview->ExistMasternode(CEnhancedCSView::AuthIndex::ByOperator, key);
             assert(itFirstMN && (*itFirstMN)->second == itCriminalMN->first);
 
