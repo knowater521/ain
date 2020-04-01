@@ -18,7 +18,7 @@ BOOST_AUTO_TEST_CASE(basic)
     st.Read({1}, value);
     printf("Result: %s\n", std::string(value.begin(), value.end()).c_str());
 
-    auto view = MakeUnique<CEnhanced123>(st);
+    auto view = MakeUnique<CEnhancedCSView>(st);
 //    view->Test();
     st.Read({1}, value);
     printf("Result non flushed: %s\n", std::string(value.begin(), value.end()).c_str());

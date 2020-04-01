@@ -147,7 +147,7 @@ public:
     virtual void findCoins(std::map<COutPoint, Coin>& coins) = 0;
 
     virtual bool mnCanSpend(const uint256 & nodeId, int height) const = 0;
-    virtual CMasternode const * mnExists(const uint256 & nodeId) const = 0;
+    virtual boost::optional<CMasternode> mnExists(const uint256 & nodeId) const = 0;
 
     //! Estimate fraction of total transactions verified if blocks up to
     //! the specified block hash are verified.
