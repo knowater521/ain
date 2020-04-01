@@ -20,7 +20,7 @@
 class CBlockHeader;
 
 /** Access to the masternodes database (masternodes/) */
-class CEnhancedCSViewDB : public CEnhancedCSView
+class CEnhancedCSViewDB : public CEnhancedCSViewOld
 {
 private:
     boost::shared_ptr<CDBWrapper> db;

@@ -277,7 +277,7 @@ public:
         return penhancedview->CanSpend(nodeId, height);
     }
 
-    CMasternode const * mnExists(const uint256 & nodeId) const override
+    boost::optional<CMasternode> mnExists(const uint256 & nodeId) const override
     {
         LOCK(cs_main);
         return penhancedview->ExistMasternode(nodeId);

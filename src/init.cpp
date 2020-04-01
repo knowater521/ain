@@ -1567,13 +1567,14 @@ bool AppInitMain(InitInterfaces& interfaces)
                         "", CClientUIInterface::MSG_ERROR);
                 });
 
-                penhancedview.reset();
-                penhancedview = MakeUnique<CEnhancedCSViewDB>(nMinDbCache << 20, false, fReset || fReindexChainState);
-                penhancedview->Load();
+//                penhancedview.reset();
+//                penhancedview = MakeUnique<CEnhancedCSViewDB>(nMinDbCache << 20, false, fReset || fReindexChainState);
+//                penhancedview->Load();
 
+                penhancedDB.reset();
                 penhancedDB = MakeUnique<CStorageLevelDB>(GetDataDir() / "enhancedstate", nMinDbCache << 20, false, fReset || fReindexChainState);
-                penhanced123 = MakeUnique<CEnhanced123>(*penhancedDB.get());
-                auto viewcache = MakeUnique<CEnhanced123>(*penhanced123.get());
+                penhancedview = MakeUnique<CEnhancedCSView>(*penhancedDB.get());
+//                auto viewcache = MakeUnique<CEnhanced123>(*penhanced123.get());
 //                penhanced123 = MakeUnique<CEnhanced123>(nMinDbCache << 20, false, fReset || fReindexChainState);
 
                 panchorauths.reset();
@@ -1906,7 +1907,7 @@ bool AppInitMain(InitInterfaces& interfaces)
                 CKey minterKey;
                 bool found =false;
                 for (auto&& wallet : wallets) {
-                    if (wallet->GetKey(myIDs->operatorAuthAddress, minterKey)) {
+                    if (wallet->GetKey(myIDs->first, minterKey)) {
                         found = true;
                         break;
                     }
@@ -1916,14 +1917,14 @@ bool AppInitMain(InitInterfaces& interfaces)
                     return false;
                 }
 
-                CMasternode const & node = *penhancedview->ExistMasternode(myIDs->id);
+                CMasternode const node = *penhancedview->ExistMasternode(myIDs->second);
                 CTxDestination destination = node.operatorType == 1 ? CTxDestination(PKHash(node.operatorAuthAddress)) : CTxDestination(WitnessV0KeyHash(node.operatorAuthAddress));
 
                 CScript coinbaseScript = GetScriptForDestination(destination);
 
                 stakerParams.coinbaseScript = coinbaseScript;
                 stakerParams.minterKey = minterKey;
-                stakerParams.masternodeID = myIDs->id;
+                stakerParams.masternodeID = myIDs->second;
             }
 
             // Mint proof-of-stake blocks in background

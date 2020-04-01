@@ -112,9 +112,13 @@ TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(cha
     {
         LOCK(cs_main);
 
-        penhancedview.reset();
-        penhancedview = MakeUnique<CEnhancedCSViewDB>(nMinDbCache << 20, true, true);
-        penhancedview->Load();
+//        penhancedview.reset();
+//        penhancedview = MakeUnique<CEnhancedCSViewDB>(nMinDbCache << 20, true, true);
+//        penhancedview->Load();
+        /// @todo newbase
+        penhancedDB.reset();
+        penhancedDB = MakeUnique<CStorageLevelDB>(GetDataDir() / "enhancedstate", nMinDbCache << 20, true, true);
+        penhancedview = MakeUnique<CEnhancedCSView>(*penhancedDB.get());
 
         panchorauths.reset();
         panchorauths = MakeUnique<CAnchorAuthIndex>();

@@ -203,7 +203,7 @@ static UniValue generatetoaddress(const JSONRPCRequest& request)
 
         bool found =false;
         for (auto&& wallet : wallets) {
-            if (wallet->GetKey(myIDs->operatorAuthAddress, minterKey)) {
+            if (wallet->GetKey(myIDs->first, minterKey)) {
                 found = true;
                 break;
             }
@@ -212,7 +212,7 @@ static UniValue generatetoaddress(const JSONRPCRequest& request)
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Error: masternode operator private key not found");
 
     }
-    return generateBlocks(coinbase_script, minterKey, myIDs->id, nGenerate, nMaxTries);
+    return generateBlocks(coinbase_script, minterKey, myIDs->second, nGenerate, nMaxTries);
 }
 
 static UniValue getmintinginfo(const JSONRPCRequest& request)
@@ -250,10 +250,10 @@ static UniValue getmintinginfo(const JSONRPCRequest& request)
     auto mnIds = penhancedview->AmIOperator();
     obj.pushKV("isoperator",       (bool) mnIds);
     if (mnIds) {
-        obj.pushKV("masternodeid", mnIds->id.GetHex());
-        obj.pushKV("masternodeoperator", mnIds->operatorAuthAddress.GetHex());
-        CMasternode const & node = *penhancedview->ExistMasternode(mnIds->id);
+        obj.pushKV("masternodeid", mnIds->second.GetHex());
+        CMasternode const & node = *penhancedview->ExistMasternode(mnIds->second);
         auto state = node.GetState();
+        obj.pushKV("masternodeoperator", node.operatorAuthAddress.GetHex());
         obj.pushKV("masternodestate", CMasternode::GetHumanReadableState(state));
         obj.pushKV("generate", node.IsActive() && gArgs.GetBoolArg("-gen", DEFAULT_GENERATE));
         obj.pushKV("mintedblocks", (uint64_t)node.mintedBlocks);

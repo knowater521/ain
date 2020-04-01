@@ -64,7 +64,7 @@ bool HasAuth(CTransaction const & tx, CKeyID const & auth)
     return false;
 }
 
-bool CheckMasternodeTx(CEnhancedCSViewCache & mnview, CTransaction const & tx, Consensus::Params const & consensusParams, int height, int txn, bool isCheck)
+bool CheckMasternodeTx(CEnhancedCSView & mnview, CTransaction const & tx, Consensus::Params const & consensusParams, int height, int txn, bool isCheck)
 {
     bool result = true;
 
@@ -93,7 +93,7 @@ bool CheckMasternodeTx(CEnhancedCSViewCache & mnview, CTransaction const & tx, C
  * Checks if given tx is 'txCreateMasternode'. Creates new MN if all checks are passed
  * Issued by: any
  */
-bool CheckCreateMasternodeTx(CEnhancedCSViewCache & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck)
+bool CheckCreateMasternodeTx(CEnhancedCSView & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck)
 {
     // Check quick conditions first
     if (tx.vout.size() < 2 ||
@@ -116,7 +116,7 @@ bool CheckCreateMasternodeTx(CEnhancedCSViewCache & mnview, CTransaction const &
     return result;
 }
 
-bool CheckResignMasternodeTx(CEnhancedCSViewCache & mnview, CTransaction const & tx, int height, int txn, const std::vector<unsigned char> & metadata, bool isCheck)
+bool CheckResignMasternodeTx(CEnhancedCSView & mnview, CTransaction const & tx, int height, int txn, const std::vector<unsigned char> & metadata, bool isCheck)
 {
     uint256 nodeId(metadata);
     auto const node = mnview.ExistMasternode(nodeId);
@@ -124,7 +124,7 @@ bool CheckResignMasternodeTx(CEnhancedCSViewCache & mnview, CTransaction const &
         return false;
 
     auto state = node->GetState(height);
-    if ((state != CMasternode::PRE_ENABLED && state != CMasternode::ENABLED) || mnview.IsAnchorInvolved(nodeId, height) )
+    if ((state != CMasternode::PRE_ENABLED && state != CMasternode::ENABLED) /*|| mnview.IsAnchorInvolved(nodeId, height) */) /// @todo newbase
     {
         /// @todo more verbose? at least, auth?
         return false;
@@ -141,7 +141,7 @@ bool CheckResignMasternodeTx(CEnhancedCSViewCache & mnview, CTransaction const &
 /*
  * Checks all inputs for collateral.
  */
-bool CheckInputsForCollateralSpent(CEnhancedCSViewCache & mnview, CTransaction const & tx, int height, bool isCheck)
+bool CheckInputsForCollateralSpent(CEnhancedCSView & mnview, CTransaction const & tx, int height, bool isCheck)
 {
     bool total(true);
     for (uint32_t i = 0; i < tx.vin.size() && total; ++i)
