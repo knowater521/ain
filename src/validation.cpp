@@ -1526,7 +1526,7 @@ int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out)
 
 /** Undo the effects of this block (with given index) on the UTXO set represented by coins.
  *  When FAILED is returned, view is left in an indeterminate state. */
-DisconnectResult CChainState::DisconnectBlock(const CBlock& block, const CBlockIndex* pindex, CCoinsViewCache& view, CEnhancedCSViewCache& mnview, std::vector<CAnchorConfirmMessage> & disconnectedAnchorConfirms, std::map<uint256, CDoubleSignFact> & disconnectedCriminals)
+DisconnectResult CChainState::DisconnectBlock(const CBlock& block, const CBlockIndex* pindex, CCoinsViewCache& view, CEnhancedCSView& mnview, std::vector<CAnchorConfirmMessage> & disconnectedAnchorConfirms, std::map<uint256, CDoubleSignFact> & disconnectedCriminals)
 {
     bool fClean = true;
 
@@ -1632,13 +1632,8 @@ DisconnectResult CChainState::DisconnectBlock(const CBlock& block, const CBlockI
         }
 
         // process transactions revert for masternodes
-        /// @todo newbase
-//        mnview.OnUndoTx(tx);
+        mnview.OnUndoTx(tx);
     }
-    // process transactions revert for masternodes
-    /// @todo newbase remove
-    mnview.OnUndoBlock(pindex->nHeight);
-
     // move best block pointer to prevout block
     view.SetBestBlock(pindex->pprev->GetBlockHash());
 
@@ -1806,7 +1801,7 @@ static int64_t nBlocksTotal = 0;
  *  Validity checks that depend on the UTXO set are also done; ConnectBlock()
  *  can fail if those validity checks fail (among other reasons). */
 bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex,
-                  CCoinsViewCache& view, CEnhancedCSViewCache& mnview, const CChainParams& chainparams, std::vector<uint256> & rewardedAnchors, std::vector<uint256> & bannedCriminals, bool fJustCheck)
+                  CCoinsViewCache& view, CEnhancedCSView& mnview, const CChainParams& chainparams, std::vector<uint256> & rewardedAnchors, std::vector<uint256> & bannedCriminals, bool fJustCheck)
 {
     AssertLockHeld(cs_main);
     assert(pindex);
@@ -1863,13 +1858,13 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
     // We are forced not to check this due to the block wasn't signed yet if called by TestBlockValidity()
     if (!fJustCheck && !fIsFakeNet) {
         // Check only that mintedBlocks counter is correct (MN existence and activation was partially checked before in CheckBlock()->ContextualCheckProofOfStake(), but not in the case of fJustCheck)
-        auto it = mnview.ExistMasternode(CEnhancedCSView::AuthIndex::ByOperator, pindex->minter);
-        assert(it);
-        auto const & node = *mnview.ExistMasternode((*it)->second);
+        auto nodeId = mnview.ExistMasternodeByOperator(pindex->minter);
+        assert(nodeId);
+        auto const & node = *mnview.ExistMasternode(*nodeId);
         if (node.mintedBlocks + 1 != block.mintedBlocks)
         {
             return state.Invalid(ValidationInvalidReason::CONSENSUS, error("ConnectBlock(): masternode's %s mintedBlocks should be %d, got %d!",
-                                                                           (*it)->second.ToString(), node.mintedBlocks + 1, block.mintedBlocks), REJECT_INVALID, "bad-minted-blocks");
+                                                                           nodeId->ToString(), node.mintedBlocks + 1, block.mintedBlocks), REJECT_INVALID, "bad-minted-blocks");
         }
         uint256 stakeModifierPrevBlock = pindex->pprev == nullptr ? uint256() : pindex->pprev->stakeModifier;
         if (block.stakeModifier != pos::ComputeStakeModifier(stakeModifierPrevBlock, node.operatorAuthAddress)) {
@@ -2182,8 +2177,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
                 }
 
                 if (pindex->pprev) {
-                    auto masternodes = mnview.GetMasternodes();
-                    if (nextTeam != mnview.CalcNextTeam(pindex->pprev->stakeModifier, &masternodes)) {
+                    if (nextTeam != mnview.CalcNextTeam(pindex->pprev->stakeModifier)) {
                         return state.Invalid(ValidationInvalidReason::CONSENSUS,
                                              error("ConnectBlock(): anchor wrong next team"),
                                              REJECT_INVALID, "bad-ar-nextteam");
@@ -2472,7 +2466,7 @@ bool CChainState::DisconnectTip(CValidationState& state, const CChainParams& cha
     int64_t nStart = GetTimeMicros();
     {
         CCoinsViewCache view(&CoinsTip());
-        CEnhancedCSViewCache mnview(penhancedview.get());
+        CEnhancedCSView mnview(*penhancedview.get());
         assert(view.GetBestBlock() == pindexDelete->GetBlockHash());
         std::vector<CAnchorConfirmMessage> disconnectedConfirms;
         std::map<uint256, CDoubleSignFact> disconnectedCriminals;
@@ -2489,7 +2483,8 @@ bool CChainState::DisconnectTip(CValidationState& state, const CChainParams& cha
             panchorAwaitingConfirms->ReVote();
         }
         for (auto const & cr : disconnectedCriminals) {
-            penhancedview->AddCriminalProof(cr.first, cr.second.blockHeader, cr.second.conflictBlockHeader);
+            /// @todo newbase
+//            penhancedview->AddCriminalProof(cr.first, cr.second.blockHeader, cr.second.conflictBlockHeader);
         }
     }
     LogPrint(BCLog::BENCH, "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * MILLI);
@@ -2614,7 +2609,7 @@ bool CChainState::ConnectTip(CValidationState& state, const CChainParams& chainp
     LogPrint(BCLog::BENCH, "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * MILLI, nTimeReadFromDisk * MICRO);
     {
         CCoinsViewCache view(&CoinsTip());
-        CEnhancedCSViewCache mnview(penhancedview.get());
+        CEnhancedCSView mnview(*penhancedview.get());
         std::vector<uint256> rewardedAnchors;
         std::vector<uint256> bannedCriminals;
         bool rv = ConnectBlock(blockConnecting, state, pindexNew, view, mnview, chainparams, rewardedAnchors, bannedCriminals);
@@ -2638,7 +2633,8 @@ bool CChainState::ConnectTip(CValidationState& state, const CChainParams& chainp
             panchorAwaitingConfirms->ReVote();
         }
         for (auto const & nodeId : bannedCriminals) {
-            penhancedview->RemoveCriminalProofs(nodeId);
+            /// @todo newbase
+//            penhancedview->RemoveCriminalProofs(nodeId);
         }
     }
     int64_t nTime4 = GetTimeMicros(); nTimeFlush += nTime4 - nTime3;
@@ -3739,13 +3735,15 @@ bool BlockManager::AcceptBlockHeader(const CBlockHeader& block, CValidationState
             // valid and safe due to previous 'ContextualCheckProofOfStake' call
             CKeyID minterKey;
             assert(block.ExtractMinterKey(minterKey));
-            auto it = penhancedview->ExistMasternode(CEnhancedCSView::AuthIndex::ByOperator, minterKey);
-            auto const & nodeId = (*it)->second;
+            auto it = penhancedview->ExistMasternodeByOperator(minterKey);
+            auto const & nodeId = *it;
 
             std::map <uint256, CBlockHeader> blockHeaders{};
-            penhancedview->FetchMintedHeaders(nodeId, block.mintedBlocks, blockHeaders, fIsFakeNet);
+            /// @todo newbase
+//            penhancedview->FetchMintedHeaders(nodeId, block.mintedBlocks, blockHeaders, fIsFakeNet);
             if (blockHeaders.find(hash) == blockHeaders.end()) {
-                penhancedview->WriteMintedBlockHeader(nodeId, block.mintedBlocks, hash, block, fIsFakeNet);
+                /// @todo newbase
+//                penhancedview->WriteMintedBlockHeader(nodeId, block.mintedBlocks, hash, block, fIsFakeNet);
             }
 
             auto state = penhancedview->ExistMasternode(nodeId)->GetState(block.height);
@@ -3753,7 +3751,8 @@ bool BlockManager::AcceptBlockHeader(const CBlockHeader& block, CValidationState
                 for (std::pair <uint256, CBlockHeader> const & blockHeader : blockHeaders) {
                     if (IsDoubleSignRestricted(block.height, blockHeader.second.height)) { // we already have equal minters and even mintedBlocks counter
                         // this is the ONLY place
-                        penhancedview->AddCriminalProof(nodeId, block, blockHeader.second);
+                        /// @todo newbase
+//                        penhancedview->AddCriminalProof(nodeId, block, blockHeader.second);
                     }
                 }
             }
@@ -3962,16 +3961,16 @@ bool AmISignerNow(CEnhancedCSView::CTeam const & team, CKeyID & operatorAuthAddr
     AssertLockHeld(cs_main);
 
     auto const mnId = penhancedview->AmIOperator();
-    if (mnId && penhancedview->ExistMasternode(mnId->id)->IsActive() && team.find(mnId->operatorAuthAddress) != team.end()) { // this is safe due to prev call `AmIOperator`
+    if (mnId && penhancedview->ExistMasternode(mnId->second)->IsActive() && team.find(mnId->first) != team.end()) { // this is safe due to prev call `AmIOperator`
         std::vector<std::shared_ptr<CWallet>> wallets = GetWallets();
         for (auto const & wallet : wallets) {
-            if (wallet->GetKey(mnId->operatorAuthAddress, masternodeKey)) {
+            if (wallet->GetKey(mnId->first, masternodeKey)) {
                 break;
             }
             masternodeKey = CKey{};
         }
         if (masternodeKey.IsValid()) {
-            operatorAuthAddress = mnId->operatorAuthAddress;
+            operatorAuthAddress = mnId->first;
             return true;
         }
     }
@@ -4118,7 +4117,7 @@ bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams,
     CCoinsViewCache viewNew(&::ChainstateActive().CoinsTip());
     std::vector<uint256> dummyRewardedAnchors;
     std::vector<uint256> dummyBannedCriminals;
-    CEnhancedCSViewCache mnview(penhancedview.get());
+    CEnhancedCSView mnview(*penhancedview.get());
     uint256 block_hash(block.GetHash());
     CBlockIndex indexDummy(block);
     indexDummy.pprev = pindexPrev;
@@ -4515,7 +4514,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
     nCheckLevel = std::max(0, std::min(4, nCheckLevel));
     LogPrintf("Verifying last %i blocks at level %i\n", nCheckDepth, nCheckLevel);
     CCoinsViewCache coins(coinsview);
-    CEnhancedCSViewCache mnview(penhancedview.get());
+    CEnhancedCSView mnview(*penhancedview.get());
     CBlockIndex* pindex;
     CBlockIndex* pindexFailure = nullptr;
     int nGoodTransactions = 0;
@@ -4559,7 +4558,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
         if (nCheckLevel >= 3 && (coins.DynamicMemoryUsage() + ::ChainstateActive().CoinsTip().DynamicMemoryUsage()) <= nCoinCacheUsage) {
             assert(coins.GetBestBlock() == pindex->GetBlockHash());
             std::vector<CAnchorConfirmMessage> disconnectedConfirms; // dummy
-            CEnhancedCSView::CMnCriminals disconnectedCriminals; // dummy
+            CEnhancedCSViewOld::CMnCriminals disconnectedCriminals; // dummy
             DisconnectResult res = ::ChainstateActive().DisconnectBlock(block, pindex, coins, mnview, disconnectedConfirms, disconnectedCriminals);
             if (res == DISCONNECT_FAILED) {
                 return error("VerifyDB(): *** irrecoverable inconsistency in block data at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
@@ -4609,7 +4608,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
 }
 
 /** Apply the effects of a block on the utxo cache, ignoring that it may already have been applied. */
-bool CChainState::RollforwardBlock(const CBlockIndex* pindex, CCoinsViewCache& inputs, CEnhancedCSViewCache& mnview, const CChainParams& params)
+bool CChainState::RollforwardBlock(const CBlockIndex* pindex, CCoinsViewCache& inputs, CEnhancedCSView& mnview, const CChainParams& params)
 {
     // TODO: merge with ConnectBlock
     CBlock block;
@@ -4637,7 +4636,7 @@ bool CChainState::ReplayBlocks(const CChainParams& params, CCoinsView* view, CEn
     LOCK(cs_main);
 
     CCoinsViewCache cache(view);
-    CEnhancedCSViewCache mncache(mnview);
+    CEnhancedCSView mncache(*mnview);
 
     std::vector<uint256> hashHeads = view->GetHeadBlocks();
     if (hashHeads.empty()) return true; // We're already in a consistent state.
@@ -4676,7 +4675,7 @@ bool CChainState::ReplayBlocks(const CChainParams& params, CCoinsView* view, CEn
             }
             LogPrintf("Rolling back %s (%i)\n", pindexOld->GetBlockHash().ToString(), pindexOld->nHeight);
             std::vector<CAnchorConfirmMessage> disconnectedConfirms; // dummy
-            CEnhancedCSView::CMnCriminals disconnectedCriminals; // dummy
+            CEnhancedCSViewOld::CMnCriminals disconnectedCriminals; // dummy
             DisconnectResult res = DisconnectBlock(block, pindexOld, cache, mncache, disconnectedConfirms, disconnectedCriminals);
             if (res == DISCONNECT_FAILED) {
                 return error("RollbackBlock(): DisconnectBlock failed at %d, hash=%s", pindexOld->nHeight, pindexOld->GetBlockHash().ToString());

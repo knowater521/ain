@@ -167,7 +167,7 @@ typedef std::map<CKeyID, uint256> CMasternodesByAuth; // for two indexes, owner-
 class CEnhancedCSViewCache;
 class CEnhancedCSViewHistory;
 
-class CEnhancedCSView
+class CEnhancedCSViewOld
 {
     using RewardTxHash = uint256;
     using AnchorTxHash = uint256;
@@ -200,12 +200,12 @@ protected:
 
     CMnBlocksUndo blocksUndo;
 
-    CEnhancedCSView() : lastHeight(0) {}
+    CEnhancedCSViewOld() : lastHeight(0) {}
 
 public:
-    CEnhancedCSView & operator=(CEnhancedCSView const & other) = delete;
+    CEnhancedCSViewOld & operator=(CEnhancedCSViewOld const & other) = delete;
 
-    void ApplyCache(CEnhancedCSView const * cache);
+    void ApplyCache(CEnhancedCSViewOld const * cache);
     void Clear();
 
     bool IsEmpty() const
@@ -213,7 +213,7 @@ public:
         return allNodes.empty() && nodesByOwner.empty() && nodesByOperator.empty() && blocksUndo.empty();
     }
 
-    virtual ~CEnhancedCSView() {}
+    virtual ~CEnhancedCSViewOld() {}
 
     void SetLastHeight(int h)
     {
@@ -325,14 +325,14 @@ public:
 };
 
 
-class CEnhancedCSViewCache : public CEnhancedCSView
+class CEnhancedCSViewCache : public CEnhancedCSViewOld
 {
 protected:
-    CEnhancedCSView * base;
+    CEnhancedCSViewOld * base;
 
 public:
-    CEnhancedCSViewCache(CEnhancedCSView * other)
-        : CEnhancedCSView()
+    CEnhancedCSViewCache(CEnhancedCSViewOld * other)
+        : CEnhancedCSViewOld()
         , base(other)
     {
         assert(base);
@@ -410,7 +410,7 @@ protected:
     std::map<int, CEnhancedCSViewCache> historyDiff;
 
 public:
-    CEnhancedCSViewHistory(CEnhancedCSView * top) : CEnhancedCSViewCache(top) { assert(top); }
+    CEnhancedCSViewHistory(CEnhancedCSViewOld * top) : CEnhancedCSViewCache(top) { assert(top); }
 
     bool Flush() override { assert(false); } // forbidden!!!
 
@@ -615,24 +615,28 @@ public:
     void RemoveRewardForAnchor(AnchorTxHash const &btcTxHash) {
         EraseBy<BtcTx>(btcTxHash);
     }
+    void ForEachAnchorReward(std::function<bool(AnchorTxHash const &, RewardTxHash &)> callback) {
+        ForEach<BtcTx, AnchorTxHash, RewardTxHash>(callback);
+    }
 
     struct BtcTx { static const unsigned char prefix; };
 };
 
-class CEnhanced123
+class CEnhancedCSView
         : public CMasternodesView
         , public CLastHeightView
         , public CTeamView
         , public CFoundationsDebtView
+        , public CAnchorRewardsView
 {
 public:
 //    explicit CEnhanced123(std::size_t cacheSize, bool fMemory = false, bool fWipe = false)
 //        : storage(new CStorageLevelDB(GetDataDir() / "masternodes", cacheSize, fMemory, fWipe)) {}
-    CEnhanced123(CStorageKV & st)
+    CEnhancedCSView(CStorageKV & st)
         : CStorageView(new CFlushableStorageKV(st))
     {}
     // cache-upon-a-cache (not a copy!) constructor
-    CEnhanced123(CEnhanced123 & other)
+    CEnhancedCSView(CEnhancedCSView & other)
         : CStorageView(new CFlushableStorageKV(other.DB()))
     {}
 
@@ -727,8 +731,9 @@ public:
 
 
 /** Global variable that points to the CMasternodeView (should be protected by cs_main) */
-extern std::unique_ptr<CEnhancedCSView> penhancedview;
+//extern std::unique_ptr<CEnhancedCSView> penhancedview;
 extern std::unique_ptr<CStorageLevelDB> penhancedDB;
-extern std::unique_ptr<CEnhanced123> penhanced123;
+//extern std::unique_ptr<CEnhanced123> penhanced123;
+extern std::unique_ptr<CEnhancedCSView> penhancedview;
 
 #endif // DEFI_MASTERNODES_MASTERNODES_H
