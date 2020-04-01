@@ -415,8 +415,9 @@ CAnchorIndex::UnrewardedResult CAnchorIndex::GetUnrewarded() const
 
     // find unrewarded
     UnrewardedResult result;
-    auto const rewards = penhancedview->ListAnchorRewards();
-    std::set_difference(confirmed.begin(), confirmed.end(), rewards.begin(), rewards.end(), std::inserter(result, result.end()), cmp());
+    /// @todo newbase
+//    auto const rewards = penhancedview->ListAnchorRewards();
+//    std::set_difference(confirmed.begin(), confirmed.end(), rewards.begin(), rewards.end(), std::inserter(result, result.end()), cmp());
 
     return result;
 }
@@ -700,8 +701,8 @@ bool CAnchorAwaitingConfirms::Validate(CAnchorConfirmMessage const &confirmMessa
         LogPrintf("AnchorConfirms::Validate: Warning! Signature incorrect. btcTxHash: %s confirmMessageHash: %s Key: %s\n", confirmMessage.btcTxHash.ToString(), confirmMessage.GetHash().ToString(), signer.ToString());
         return false;
     }
-    auto it = penhancedview->ExistMasternode(CEnhancedCSView::AuthIndex::ByOperator, signer);
-    if (!it || !penhancedview->ExistMasternode((*it)->second)->IsActive()) {
+    auto it = penhancedview->ExistMasternodeByOperator(signer);
+    if (!it || !penhancedview->ExistMasternode(*it)->IsActive()) {
         LogPrintf("AnchorConfirms::Validate: Warning! Masternode with operator key %s does not exist or not active!\n", signer.ToString());
         return false;
     }
@@ -725,9 +726,9 @@ void CAnchorAwaitingConfirms::ReVote()
     AssertLockHeld(cs_main);
 
     auto myIDs = penhancedview->AmIOperator();
-    if (myIDs && penhancedview->ExistMasternode(myIDs->id)->IsActive()) {
+    if (myIDs && penhancedview->ExistMasternode(myIDs->second)->IsActive()) {
         auto const & currentTeam = penhancedview->GetCurrentTeam();
-        if (currentTeam.find(myIDs->operatorAuthAddress) != currentTeam.end()) {
+        if (currentTeam.find(myIDs->first) != currentTeam.end()) {
 
             CAnchorIndex::UnrewardedResult unrewarded = panchors->GetUnrewarded();
             for (auto const & btcTxHash : unrewarded) {

@@ -199,13 +199,13 @@ UniValue createmasternode(const JSONRPCRequest& request)
     {
         auto locked_chain = pwallet->chain().lock();
 
-        if (penhancedview->ExistMasternode(CEnhancedCSView::AuthIndex::ByOwner, ownerAuthKey) ||
-            penhancedview->ExistMasternode(CEnhancedCSView::AuthIndex::ByOperator, ownerAuthKey))
+        if (penhancedview->ExistMasternodeByOwner(ownerAuthKey) ||
+            penhancedview->ExistMasternodeByOperator(ownerAuthKey))
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Masternode with collateralAddress == " + collateralAddress + " already exists");
         }
-        if (penhancedview->ExistMasternode(CEnhancedCSView::AuthIndex::ByOwner, operatorAuthKey) ||
-            penhancedview->ExistMasternode(CEnhancedCSView::AuthIndex::ByOperator, operatorAuthKey))
+        if (penhancedview->ExistMasternodeByOwner(operatorAuthKey) ||
+            penhancedview->ExistMasternodeByOperator(operatorAuthKey))
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Masternode with operatorAuthAddress == " + EncodeDestination(operatorDest) + " already exists");
         }
@@ -386,23 +386,27 @@ UniValue listmasternodes(const JSONRPCRequest& request)
     auto locked_chain = pwallet->chain().lock();
 
     UniValue ret(UniValue::VOBJ);
-    CMasternodes const & mns = penhancedview->GetMasternodes();
+//    CMasternodes const & mns = penhancedview->GetMasternodes();
     if (inputs.empty())
     {
         // Dumps all!
-        for (auto it = mns.begin(); it != mns.end(); ++it)
-        {
-            if (it->second != CMasternode())
-                ret.pushKV(it->first.GetHex(), verbose ? mnToJSON(it->second) : CMasternode::GetHumanReadableState(it->second.GetState()));
-        }
+        penhancedview->ForEachMasternode([&ret, verbose] (uint256 const & nodeId, CMasternode & node) {
+            ret.pushKV(nodeId.GetHex(), verbose ? mnToJSON(node) : CMasternode::GetHumanReadableState(node.GetState()));
+            return true;
+        });
+//        for (auto it = mns.begin(); it != mns.end(); ++it)
+//        {
+//            if (it->second != CMasternode())
+//                ret.pushKV(it->first.GetHex(), verbose ? mnToJSON(it->second) : CMasternode::GetHumanReadableState(it->second.GetState()));
+//        }
     }
     else
     {
         for (size_t idx = 0; idx < inputs.size(); ++idx)
         {
             uint256 id = ParseHashV(inputs[idx], "masternode id");
-            auto const & node = penhancedview->ExistMasternode(id);
-            if (node && *node != CMasternode())
+            auto const node = penhancedview->ExistMasternode(id);
+            if (node)
             {
                 ret.pushKV(id.GetHex(), verbose ? mnToJSON(*node) : CMasternode::GetHumanReadableState(node->GetState()));
             }
@@ -431,16 +435,17 @@ UniValue listcriminalproofs(const JSONRPCRequest& request)
     auto locked_chain = pwallet->chain().lock();
 
     UniValue ret(UniValue::VOBJ);
-    auto const proofs = penhancedview->GetUnpunishedCriminals();
-    for (auto const & proof : proofs) {
-        UniValue obj(UniValue::VOBJ);
-        obj.pushKV("hash1", proof.second.blockHeader.GetHash().ToString());
-        obj.pushKV("height1", proof.second.blockHeader.height);
-        obj.pushKV("hash2", proof.second.conflictBlockHeader.GetHash().ToString());
-        obj.pushKV("height2", proof.second.conflictBlockHeader.height);
-        obj.pushKV("mintedBlocks", proof.second.blockHeader.mintedBlocks);
-        ret.pushKV(proof.first.ToString(), obj);
-    }
+    /// @todo newbase
+//    auto const proofs = penhancedview->GetUnpunishedCriminals();
+//    for (auto const & proof : proofs) {
+//        UniValue obj(UniValue::VOBJ);
+//        obj.pushKV("hash1", proof.second.blockHeader.GetHash().ToString());
+//        obj.pushKV("height1", proof.second.blockHeader.height);
+//        obj.pushKV("hash2", proof.second.conflictBlockHeader.GetHash().ToString());
+//        obj.pushKV("height2", proof.second.conflictBlockHeader.height);
+//        obj.pushKV("mintedBlocks", proof.second.blockHeader.mintedBlocks);
+//        ret.pushKV(proof.first.ToString(), obj);
+//    }
     return ret;
 }
 
