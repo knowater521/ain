@@ -15,29 +15,11 @@
 using TBytes = std::vector<unsigned char>;
 using MapKV = std::map<TBytes, boost::optional<TBytes>>;
 
-template<typename T>
-static TBytes DbTypeToBytes(const T& value) {
-    CDataStream stream(SER_DISK, CLIENT_VERSION);
-    stream << value;
-    return TBytes(stream.begin(), stream.end());
-}
-
-template<typename T>
-static void BytesToDbType(const TBytes& bytes, T& value) {
-    try {
-        CDataStream stream(bytes, SER_DISK, CLIENT_VERSION);
-        stream >> value;
-        assert(stream.size() == 0);
-    }
-    catch (std::ios_base::failure&) {
-    }
-}
-
 // Key-Value storage iterator interface
 class CStorageKVIterator {
 public:
-    virtual ~CStorageKVIterator() {};
-    virtual void Seek(const TBytes& key, size_t key_size) = 0;
+    virtual ~CStorageKVIterator() {}
+    virtual void Seek(const TBytes& key, size_t keysize = 0) = 0;
     virtual void Next() = 0;
     virtual bool Valid() = 0;
     virtual TBytes Key() = 0;
@@ -61,23 +43,17 @@ class CStorageLevelDBIterator : public CStorageKVIterator {
 public:
     explicit CStorageLevelDBIterator(std::unique_ptr<CDBIterator>&& it) : it{std::move(it)} { }
     ~CStorageLevelDBIterator() override { }
-    void Seek(const TBytes& key, size_t size) override {
+    void Seek(const TBytes& key, size_t dummy = 0) override {
 //        CDataStream ssKey(SER_DISK, CLIENT_VERSION);
 //        ssKey.reserve(ssKey.GetSerializeSize(key));
 //        ssKey << key;
 //        leveldb::Slice slKey(&ssKey[0], ssKey.size());
 //        it->Seek(slKey);
-        prefix = key;
-        key_size = size;
-        TBytes searchkey(key);
-        searchkey.resize(key_size, 0);
-        it->Seek(searchkey); // lower_bound in fact
+        (void) dummy;
+        it->Seek(key);
     }
     void Next() override { it->Next(); }
-    bool Valid() override {
-        TBytes dummy;
-        return it->Valid() && it->GetKey(dummy) && dummy.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), dummy.begin());
-    }
+    bool Valid() override { return it->Valid(); }
     TBytes Key() override {
         TBytes result;
         return (it->GetKey(result)) ? result : TBytes{};
@@ -90,14 +66,12 @@ public:
     }
 private:
     std::unique_ptr<CDBIterator> it;
-    TBytes prefix;
-    size_t key_size;
     // No copying allowed
     CStorageLevelDBIterator(const CStorageLevelDBIterator&);
     void operator=(const CStorageLevelDBIterator&);
 
-//    TBytes ExtractSlice(const leveldb::Slice& s) {
-//        TBytes v;
+//    std::vector<unsigned char> ExtractSlice(const leveldb::Slice& s) {
+//        std::vector<unsigned char> v;
 //        CDataStream stream(s.data(), s.data() + s.size(), SER_DISK, CLIENT_VERSION);
 //        stream >> v;
 //        return v;
@@ -158,16 +132,29 @@ public:
     CFlushableStorageKVIterator(const CFlushableStorageKVIterator&) = delete;
     void operator=(const CFlushableStorageKVIterator&) = delete;
     ~CFlushableStorageKVIterator() override { }
-    void Seek(const TBytes& key, size_t key_size) override {
+//    void Seek(const TBytes& key) override {
+//        prevKey.clear();
+//        pIt->Seek(key);
+//        parentOk = pIt->Valid();
+//        mIt = map.lower_bound(key);
+//        mapOk = mIt != map.end();
+//        inited = true;
+//        Next();
+//    }
+    void Seek(const TBytes& key, size_t keysize = 0) override {
         prevKey.clear();
-        pIt->Seek(key, key_size);
+        pIt->Seek(key, keysize);
         parentOk = pIt->Valid();
-        TBytes lowerbound(key);
-        lowerbound.resize(key_size, 0);
-        TBytes upperbound(key);
-        upperbound.resize(key_size, 0xff);
-        mIt = map.lower_bound(lowerbound);
-        mEnd = map.upper_bound(upperbound);
+
+        if (keysize == 0)
+            keysize = key.size();
+
+        TBytes lowerBound(key);
+        lowerBound.resize(keysize, 0);
+        TBytes upperBound(key);
+        upperBound.resize(keysize, 0xff);
+        mIt = map.lower_bound(lowerBound);
+        mEnd = map.upper_bound(upperBound);
         mapOk = mIt != mEnd;
         inited = true;
         Next();
@@ -194,7 +181,7 @@ public:
                     }
                     if (mapOk) {
                         mIt++;
-                        mapOk = mIt != mEnd;   //map.end();
+                        mapOk = mIt != mEnd;
                     }
                     if (ok) return;
                 }
@@ -214,6 +201,49 @@ public:
             }
         }
     }
+//    void Next() override {
+//        if (!inited) throw std::runtime_error("Iterator wasn't inited.");
+//        key.clear();
+//        value.clear();
+
+//        while (mapOk || parentOk) {
+//            if (mapOk) {
+//                while (mapOk && (!parentOk || mIt->first <= pIt->Key())) {
+//                    bool ok = false;
+
+//                    if (mIt->second) {
+//                        ok = prevKey.empty() || mIt->first > prevKey;
+//                    }
+//                    else {
+//                        prevKey = mIt->first;
+//                    }
+//                    if (ok) {
+//                        key = mIt->first, value = *mIt->second;
+//                        prevKey = mIt->first;
+//                    }
+//                    if (mapOk) {
+//                        mIt++;
+//                        mapOk = mIt != map.end();
+//                    }
+//                    if (ok) return;
+//                }
+//            }
+//            if (parentOk) {
+//                bool ok = prevKey.empty() || pIt->Key() > prevKey;
+//                if (ok) {
+//                    key = pIt->Key();
+//                    value = pIt->Value();
+//                    prevKey = key;
+//                }
+//                if (parentOk) {
+//                    pIt->Next();
+//                    parentOk = pIt->Valid();
+//                }
+//                if (ok) return;
+//            }
+//        }
+//    }
+
     bool Valid() override {
         return !key.empty();
     }
@@ -272,7 +302,7 @@ public:
             }
         }
     }
-    bool Flush() override {
+    bool Flush() {
         for (auto it = changed.begin(); it != changed.end(); it++) {
             if (!it->second) {
                 if (!db.Erase(it->first))
@@ -378,10 +408,10 @@ public:
         for(it->Seek(DbTypeToBytes(By::prefix), GetSerializeSize(key)); it->Valid(); it->Next()) {
             boost::this_thread::interruption_point();
 
-//            TBytes keyBytes(it->Key());
-//            LogPrintf("forEachKey:___ %s\n", HexStr(keyBytes).c_str());
-            BytesToDbType(it->Key(), key); // can fail
-//            if (key.first == By::prefix) {
+            TBytes keyBytes(it->Key());
+            LogPrintf("Key: %s\n", HexStr(keyBytes).c_str());
+            BytesToDbType(keyBytes, key); // can fail
+            if (key.first == By::prefix) {
 
                 TBytes valueBytes = it->Value();
                 if (valueBytes.size()) {
@@ -394,30 +424,30 @@ public:
                 } else {
                     return error("ForEach() : unable to read value");
                 }
-//            } else {
-//                break;
-//            }
+            } else {
+                break;
+            }
         }
         return true;
     }
 
-//    template<typename T>
-//    static TBytes DbTypeToBytes(const T& value) {
-//        CDataStream stream(SER_DISK, CLIENT_VERSION);
-//        stream << value;
-//        return TBytes(stream.begin(), stream.end());
-//    }
+    template<typename T>
+    static TBytes DbTypeToBytes(const T& value) {
+        CDataStream stream(SER_DISK, CLIENT_VERSION);
+        stream << value;
+        return TBytes(stream.begin(), stream.end());
+    }
 
-//    template<typename T>
-//    static void BytesToDbType(const TBytes& bytes, T& value) {
-//        try {
-//            CDataStream stream(bytes, SER_DISK, CLIENT_VERSION);
-//            stream >> value;
-//            assert(stream.size() == 0);
-//        }
-//        catch (std::ios_base::failure&) {
-//        }
-//    }
+    template<typename T>
+    static void BytesToDbType(const TBytes& bytes, T& value) {
+        try {
+            CDataStream stream(bytes, SER_DISK, CLIENT_VERSION);
+            stream >> value;
+            assert(stream.size() == 0);
+        }
+        catch (std::ios_base::failure&) {
+        }
+    }
 
 protected:
     CStorageKV & DB() { return *storage.get(); }

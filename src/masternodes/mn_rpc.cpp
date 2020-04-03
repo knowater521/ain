@@ -385,6 +385,14 @@ UniValue listmasternodes(const JSONRPCRequest& request)
 
     auto locked_chain = pwallet->chain().lock();
 
+    auto it = penhancedDB->NewIterator();
+    LogPrintf("DUMP:\n");
+    for (it->Seek({'M'}, GetSerializeSize(std::make_pair('M', uint256()))); it->Valid(); it->Next()) {
+        LogPrintf("Key: %s Value: %s\n", HexStr(it->Key()).c_str(), HexStr(it->Value()).c_str());
+//        LogPrintf("Value: %s\n", HexStr(it->Value()).c_str());
+    }
+
+
     UniValue ret(UniValue::VOBJ);
 //    CMasternodes const & mns = penhancedview->GetMasternodes();
     if (inputs.empty())
