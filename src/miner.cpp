@@ -189,35 +189,35 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     }
 
     CTransactionRef criminalTx = nullptr;
-    /// @todo newbase
-//    if (fCriminals) {
-//        CEnhancedCSView::CMnCriminals criminals = penhancedview->GetUnpunishedCriminals();
-//        if (criminals.size() != 0) {
-//            CEnhancedCSView::CMnCriminals::iterator itCriminalMN = criminals.begin();
-//            auto const & proof = itCriminalMN->second;
-//            CKeyID key;
-//            assert(IsDoubleSigned(proof.blockHeader, proof.conflictBlockHeader, key));
-//            auto itFirstMN = penhancedview->ExistMasternode(CEnhancedCSView::AuthIndex::ByOperator, key);
-//            assert(itFirstMN && (*itFirstMN)->second == itCriminalMN->first);
+    if (fCriminals) {
+        CCriminalProofsView::CMnCriminals criminals = pcriminals->GetUnpunishedCriminals();
+        if (criminals.size() != 0) {
+            CCriminalProofsView::CMnCriminals::iterator itCriminalMN = criminals.begin();
+            auto const & proof = itCriminalMN->second;
+            CKeyID minter;
+            assert(IsDoubleSigned(proof.blockHeader, proof.conflictBlockHeader, minter));
+            // not necessary - checked by GetUnpunishedCriminals()
+//            auto itFirstMN = penhancedview->ExistMasternodeByOperator(minter);
+//            assert(itFirstMN && (*itFirstMN) == itCriminalMN->first);
 
-//            CDataStream metadata(DfCriminalTxMarker, SER_NETWORK, PROTOCOL_VERSION);
-//            metadata << proof.blockHeader << proof.conflictBlockHeader << (*itFirstMN)->second;
+            CDataStream metadata(DfCriminalTxMarker, SER_NETWORK, PROTOCOL_VERSION);
+            metadata << proof.blockHeader << proof.conflictBlockHeader << itCriminalMN->first;
 
-//            CMutableTransaction newCriminalTx;
-//            newCriminalTx.vin.resize(1);
-//            newCriminalTx.vin[0].prevout.SetNull();
-//            newCriminalTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
-//            newCriminalTx.vout.resize(1);
-//            newCriminalTx.vout[0].scriptPubKey = CScript() << OP_RETURN << ToByteVector(metadata);
-//            newCriminalTx.vout[0].nValue = 0;
+            CMutableTransaction newCriminalTx;
+            newCriminalTx.vin.resize(1);
+            newCriminalTx.vin[0].prevout.SetNull();
+            newCriminalTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
+            newCriminalTx.vout.resize(1);
+            newCriminalTx.vout[0].scriptPubKey = CScript() << OP_RETURN << ToByteVector(metadata);
+            newCriminalTx.vout[0].nValue = 0;
 
-//            pblock->vtx.push_back(MakeTransactionRef(std::move(newCriminalTx)));
-//            criminalTx = pblock->vtx.back();
+            pblock->vtx.push_back(MakeTransactionRef(std::move(newCriminalTx)));
+            criminalTx = pblock->vtx.back();
 
-//            pblocktemplate->vTxFees.push_back(0);
-//            pblocktemplate->vTxSigOpsCost.push_back(WITNESS_SCALE_FACTOR * GetLegacySigOpCount(*pblock->vtx.back()));
-//        }
-//    }
+            pblocktemplate->vTxFees.push_back(0);
+            pblocktemplate->vTxSigOpsCost.push_back(WITNESS_SCALE_FACTOR * GetLegacySigOpCount(*pblock->vtx.back()));
+        }
+    }
 
     int nPackagesSelected = 0;
     int nDescendantsUpdated = 0;
@@ -596,8 +596,7 @@ namespace pos {
                 std::map <uint256, CBlockHeader> blockHeaders{};
                 {
                     LOCK(cs_main);
-                    /// @todo newbase
-//                    penhancedview->FetchMintedHeaders(args.masternodeID, mintedBlocks + 1, blockHeaders, fIsFakeNet);
+                    pcriminals->FetchMintedHeaders(args.masternodeID, mintedBlocks + 1, blockHeaders, fIsFakeNet);
                 }
                 for (std::pair <uint256, CBlockHeader> const & blockHeader : blockHeaders) {
                     if (IsDoubleSignRestricted(blockHeader.second.height, tip->nHeight + (uint64_t)1)) {
