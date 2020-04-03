@@ -86,13 +86,22 @@ private:
 // LevelDB glue layer storage
 class CStorageLevelDB : public CStorageKV {
 public:
-    explicit CStorageLevelDB(const fs::path& dbName, std::size_t cacheSize, bool fMemory = false, bool fWipe = false) : db{dbName, cacheSize, fMemory, fWipe} {}
+    explicit CStorageLevelDB(const fs::path& dbName, std::size_t cacheSize, bool fMemory = false, bool fWipe = false, bool fDirectWrite = false)
+        : db{dbName, cacheSize, fMemory, fWipe}, directWrite(fDirectWrite) {}
     ~CStorageLevelDB() override { }
     bool Exists(const TBytes& key) const override { return db.Exists(key); }
-//    bool Write(const TBytes& key, const TBytes& value) override { return db.Write(key, value, true); }
-    bool Write(const TBytes& key, const TBytes& value) override { BatchWrite(key, value); return true; }
-//    bool Erase(const TBytes& key) override { return db.Erase(key, true); }
-    bool Erase(const TBytes& key) override { BatchErase(key); return true; }
+    bool Write(const TBytes& key, const TBytes& value) override {
+        if (directWrite)
+            return db.Write(key, value, true);
+        BatchWrite(key, value);
+        return true;
+    }
+    bool Erase(const TBytes& key) override {
+        if (directWrite)
+            return db.Erase(key, true);
+        BatchErase(key);
+        return true;
+    }
     bool Read(const TBytes& key, TBytes& value) const override { return db.Read(key, value); }
     bool Flush() override { // Commit batch
         bool result = true;
@@ -123,6 +132,7 @@ private:
 
     CDBWrapper db;
     boost::scoped_ptr<CDBBatch> batch;
+    bool directWrite;
 };
 
 // Flashable storage
@@ -339,12 +349,11 @@ public:
         return {};
     }
 
-    /// @todo constness??
     template<typename By, typename KeyType, typename ValueType>
-    bool ForEach(std::function<bool(KeyType const &, ValueType &)> callback, KeyType hint = KeyType()) {
+    bool ForEach(std::function<bool(KeyType const &, ValueType &)> callback, KeyType const & hint = KeyType()) {
 
         using pref_type = typename std::remove_const<decltype( By::prefix )>::type;
-        auto key = std::make_pair<pref_type, KeyType>(pref_type(By::prefix), hint);
+        auto key = std::make_pair<pref_type, KeyType>(pref_type(By::prefix), KeyType(hint));
 //            std::pair<char, KeyType> key; // failsafe
 
         auto it = DB().NewIterator();

@@ -52,15 +52,15 @@ inline void Unserialize(Stream& s, MasternodesTxType & txType) {
                          MasternodesTxType::None;
 }
 
+//! Checks if given tx is probably one of custom 'MasternodeTx', returns tx type and serialized metadata in 'data'
+MasternodesTxType GuessMasternodeTxType(CTransaction const & tx, std::vector<unsigned char> & metadata);
+
 // Works instead of constants cause 'regtest' differs (don't want to overcharge chainparams)
 int GetMnActivationDelay();
 int GetMnResignDelay();
 int GetMnHistoryFrame();
 CAmount GetMnCollateralAmount();
 CAmount GetMnCreationFee(int height);
-
-//! Checks if given tx is probably one of custom 'MasternodeTx', returns tx type and serialized metadata in 'data'
-MasternodesTxType GuessMasternodeTxType(CTransaction const & tx, std::vector<unsigned char> & metadata);
 
 bool IsDoubleSignRestricted(uint64_t height1, uint64_t height2);
 bool IsDoubleSigned(CBlockHeader const & oneHeader, CBlockHeader const & twoHeader, CKeyID & minter);
@@ -142,43 +142,17 @@ public:
     friend bool operator!=(CMasternode const & a, CMasternode const & b);
 };
 
-class CDoubleSignFact
-{
-public:
-    CBlockHeader blockHeader;
-    CBlockHeader conflictBlockHeader;
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action)
-    {
-        READWRITE(blockHeader);
-        READWRITE(conflictBlockHeader);
-    }
-
-    friend bool operator==(CDoubleSignFact const & a, CDoubleSignFact const & b);
-    friend bool operator!=(CDoubleSignFact const & a, CDoubleSignFact const & b);
-};
-
-//typedef std::map<uint256, CMasternode> CMasternodes;  // nodeId -> masternode object,
-//typedef std::map<CKeyID, uint256> CMasternodesByAuth; // for two indexes, owner->nodeId, operator->nodeId
-
 class CEnhancedCSViewCache;
 class CEnhancedCSViewHistory;
 
+
 class CEnhancedCSViewOld
 {
-//    using RewardTxHash = uint256;
-//    using AnchorTxHash = uint256;
 public:
 //    typedef std::map<int, std::pair<uint256, MasternodesTxType> > CMnTxsUndo; // txn, undoRec
 //    typedef std::map<int, CMnTxsUndo> CMnBlocksUndo;
-    typedef std::map<uint256, CDoubleSignFact> CMnCriminals; // nodeId, two headers
 
 protected:
-    CMnCriminals criminals;
-
 //    CMnBlocksUndo blocksUndo;
 
     CEnhancedCSViewOld() {}
@@ -190,25 +164,12 @@ public:
 
     virtual ~CEnhancedCSViewOld() {}
 
-    // "off-chain" data, should be written directly
-    virtual void WriteMintedBlockHeader(uint256 const & txid, uint64_t const mintedBlocks, uint256 const & hash, CBlockHeader const & blockHeader, bool fIsFakeNet = true) { assert(false); }
-    virtual bool FetchMintedHeaders(uint256 const & txid, uint64_t const mintedBlocks, std::map<uint256, CBlockHeader> & blockHeaders, bool fIsFakeNet = true) { assert(false); }
-    virtual void EraseMintedBlockHeader(uint256 const & txid, uint64_t const mintedBlocks, uint256 const & hash) { assert(false); }
-
-    // "off-chain" data, should be written directly
-    virtual void WriteCriminal(uint256 const & mnId, CDoubleSignFact const & doubleSignFact) { assert(false); }
-    virtual void EraseCriminal(uint256 const & mnId) { assert(false); }
 
 //    bool IsAnchorInvolved(uint256 const & nodeId, int height) const;
 
 //    CEnhancedCSViewCache OnUndoBlock(int height);
 
     void PruneOlder(int height);
-
-    // Criminals
-    void AddCriminalProof(uint256 const & id, CBlockHeader const & blockHeader, CBlockHeader const & conflictBlockHeader);
-    void RemoveCriminalProofs(uint256 const &criminalID);
-    CMnCriminals GetUnpunishedCriminals() const;
 
 protected:
 //    virtual CMnBlocksUndo::mapped_type const & GetBlockUndo(CMnBlocksUndo::key_type key) const;
@@ -237,12 +198,12 @@ const unsigned char DB_MN_OPERATORS = 'o';    // masternodes' operators index
 const unsigned char DB_MN_OWNERS = 'w';       // masternodes' owners index
 const unsigned char DB_MASTERNODESUNDO = 'U'; // undo table
 const unsigned char DB_MN_HEIGHT = 'H';       // single record with last processed chain height
-
-const unsigned char DB_MN_BLOCK_HEADERS = 'h';
-const unsigned char DB_MN_CRIMINALS = 'm';
 const unsigned char DB_MN_ANCHOR_REWARD = 'r';
 const unsigned char DB_MN_CURRENT_TEAM = 't';
 const unsigned char DB_MN_FOUNDERS_DEBT = 'd';
+
+const unsigned char DB_MN_BLOCK_HEADERS = 'h';
+const unsigned char DB_MN_CRIMINALS = 'm';
 
 class CMasternodesView : public virtual CStorageView
 {
@@ -288,7 +249,7 @@ public:
         assert(nodeId);
         auto node = ExistMasternode(*nodeId);
         assert(node);
-        ++node->mintedBlocks;
+        --node->mintedBlocks;
         WriteBy<ID>(*nodeId, *node);
     }
 
@@ -482,8 +443,6 @@ class CEnhancedCSView
         , public CAnchorRewardsView
 {
 public:
-//    explicit CEnhanced123(std::size_t cacheSize, bool fMemory = false, bool fWipe = false)
-//        : storage(new CStorageLevelDB(GetDataDir() / "masternodes", cacheSize, fMemory, fWipe)) {}
     CEnhancedCSView(CStorageKV & st)
         : CStorageView(new CFlushableStorageKV(st))
     {}
@@ -492,7 +451,7 @@ public:
         : CStorageView(new CFlushableStorageKV(other.DB()))
     {}
 
-    // cause depends on current mns
+    // cause depends on current mns:
     CTeamView::CTeam CalcNextTeam(uint256 const & stakeModifier);
 
     /// @todo newbase move to networking?
@@ -532,13 +491,137 @@ public:
         }
     }
 
-
     bool Flush() { return DB().Flush(); }
 };
-
 
 /** Global variable that points to the CMasternodeView (should be protected by cs_main) */
 extern std::unique_ptr<CStorageLevelDB> penhancedDB;
 extern std::unique_ptr<CEnhancedCSView> penhancedview;
+
+
+struct DBMNBlockHeadersKey
+{
+    uint256 masternodeID;
+    uint64_t mintedBlocks;
+    uint256 blockHash;
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
+    {
+        READWRITE(masternodeID);
+        READWRITE(mintedBlocks);
+        READWRITE(blockHash);
+    }
+};
+
+class CMintedHeadersView : public virtual CStorageView
+{
+public:
+    void WriteMintedBlockHeader(uint256 const & txid, uint64_t const mintedBlocks, uint256 const & hash, CBlockHeader const & blockHeader, bool fIsFakeNet)
+    {
+        if (fIsFakeNet) {
+            return;
+        }
+        // directly!
+        WriteBy<MintedHeaders>(DBMNBlockHeadersKey{txid, mintedBlocks, hash}, blockHeader);
+    }
+
+    bool FetchMintedHeaders(uint256 const & txid, uint64_t const mintedBlocks, std::map<uint256, CBlockHeader> & blockHeaders, bool fIsFakeNet)
+    {
+        if (fIsFakeNet) {
+            return false;
+        }
+
+        blockHeaders.clear();
+        ForEach<MintedHeaders,DBMNBlockHeadersKey,CBlockHeader>([&txid, &mintedBlocks, &blockHeaders] (DBMNBlockHeadersKey const & key, CBlockHeader & blockHeader) {
+            if (key.masternodeID == txid &&
+                key.mintedBlocks == mintedBlocks) {
+
+                blockHeaders.emplace(key.blockHash, std::move(blockHeader));
+                return true; // continue
+            }
+            return false; // break!
+        }, DBMNBlockHeadersKey{ txid, mintedBlocks, uint256{} } );
+
+        return true;
+    }
+
+    void EraseMintedBlockHeader(uint256 const & txid, uint64_t const mintedBlocks, uint256 const & hash)
+    {
+        // directly!
+        EraseBy<MintedHeaders>(DBMNBlockHeadersKey{txid, mintedBlocks, hash});
+    }
+
+    struct MintedHeaders { static const unsigned char prefix; };
+};
+
+class CDoubleSignFact
+{
+public:
+    CBlockHeader blockHeader;
+    CBlockHeader conflictBlockHeader;
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
+    {
+        READWRITE(blockHeader);
+        READWRITE(conflictBlockHeader);
+    }
+
+    friend bool operator==(CDoubleSignFact const & a, CDoubleSignFact const & b);
+    friend bool operator!=(CDoubleSignFact const & a, CDoubleSignFact const & b);
+};
+
+class CCriminalProofsView : public virtual CStorageView
+{
+public:
+    void AddCriminalProof(uint256 const & id, CBlockHeader const & blockHeader, CBlockHeader const & conflictBlockHeader) {
+        WriteBy<Proofs>(id, CDoubleSignFact{blockHeader, conflictBlockHeader});
+        LogPrintf("Add criminal proof for node %s, blocks: %s, %s\n", id.ToString(), blockHeader.GetHash().ToString(), conflictBlockHeader.GetHash().ToString());
+    }
+
+    void RemoveCriminalProofs(uint256 const & mnId) {
+        // in fact, only one proof
+        EraseBy<Proofs>(mnId);
+        LogPrintf("Criminals: erase proofs for node %s\n", mnId.ToString());
+    }
+
+    using CMnCriminals = std::map<uint256, CDoubleSignFact>; // nodeId, two headers
+    CMnCriminals GetUnpunishedCriminals() {
+
+        CMnCriminals result;
+        ForEach<Proofs, uint256, CDoubleSignFact>([&result] (uint256 const & id, CDoubleSignFact & proof) {
+
+            // matching with already punished. and this is the ONLY measure!
+            auto node = penhancedview->ExistMasternode(id); // assert?
+            if (node && node->banTx.IsNull()) {
+                result.emplace(id, std::move(proof));
+            }
+            return true; // continue
+        });
+        return result;
+    }
+
+    struct Proofs { static const unsigned char prefix; };
+};
+
+// "off-chain" data, should be written directly
+class CCriminalsView
+        : public CMintedHeadersView
+        , public CCriminalProofsView
+{
+public:
+    CCriminalsView(const fs::path& dbName, std::size_t cacheSize, bool fMemory = false, bool fWipe = false)
+        : CStorageView(new CStorageLevelDB(dbName, cacheSize, fMemory, fWipe, true)) // direct!
+    {}
+
+};
+extern std::unique_ptr<CCriminalsView> pcriminals;
+
+
 
 #endif // DEFI_MASTERNODES_MASTERNODES_H
