@@ -385,16 +385,14 @@ UniValue listmasternodes(const JSONRPCRequest& request)
 
     auto locked_chain = pwallet->chain().lock();
 
-    auto it = penhancedDB->NewIterator();
-    LogPrintf("DUMP:\n");
-    for (it->Seek({'M'}, GetSerializeSize(std::make_pair('M', uint256()))); it->Valid(); it->Next()) {
-        LogPrintf("Key: %s Value: %s\n", HexStr(it->Key()).c_str(), HexStr(it->Value()).c_str());
-//        LogPrintf("Value: %s\n", HexStr(it->Value()).c_str());
-    }
-
+//    auto it = penhancedDB->NewIterator();
+//    LogPrintf("DUMP:\n");
+//    std::pair<unsigned char, CKeyID> key{};
+//    for (it->Seek(DbTypeToBytes(std::make_pair('o', CKeyID()))); it->Valid() && (BytesToDbType(it->Key(), key), key.first == 'o'); it->Next()) {
+//        LogPrintf("Key: %s Value: %s\n", HexStr(it->Key()).c_str(), HexStr(it->Value()).c_str());
+//    }
 
     UniValue ret(UniValue::VOBJ);
-//    CMasternodes const & mns = penhancedview->GetMasternodes();
     if (inputs.empty())
     {
         // Dumps all!
@@ -402,11 +400,6 @@ UniValue listmasternodes(const JSONRPCRequest& request)
             ret.pushKV(nodeId.GetHex(), verbose ? mnToJSON(node) : CMasternode::GetHumanReadableState(node.GetState()));
             return true;
         });
-//        for (auto it = mns.begin(); it != mns.end(); ++it)
-//        {
-//            if (it->second != CMasternode())
-//                ret.pushKV(it->first.GetHex(), verbose ? mnToJSON(it->second) : CMasternode::GetHumanReadableState(it->second.GetState()));
-//        }
     }
     else
     {
@@ -414,8 +407,7 @@ UniValue listmasternodes(const JSONRPCRequest& request)
         {
             uint256 id = ParseHashV(inputs[idx], "masternode id");
             auto const node = penhancedview->ExistMasternode(id);
-            if (node)
-            {
+            if (node) {
                 ret.pushKV(id.GetHex(), verbose ? mnToJSON(*node) : CMasternode::GetHumanReadableState(node->GetState()));
             }
         }
