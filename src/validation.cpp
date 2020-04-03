@@ -2340,7 +2340,8 @@ bool CChainState::FlushStateToDisk(
             }
             // Flush the chainstate (which may refer to block index entries).
             /// @todo may be integrate penhancedview into ChainState?
-            if (!CoinsTip().Flush() || !penhancedview->Flush())
+            /// @attention it is critical to flush 'penhancedview', then 'penhancedDB'!!!
+            if (!CoinsTip().Flush() || !penhancedview->Flush() || !penhancedDB->Flush())
                 return AbortNode(state, "Failed to write to coin or masternodes database");
             nLastFlush = nNow;
             full_flush_completed = true;

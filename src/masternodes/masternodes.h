@@ -161,104 +161,34 @@ public:
     friend bool operator!=(CDoubleSignFact const & a, CDoubleSignFact const & b);
 };
 
-typedef std::map<uint256, CMasternode> CMasternodes;  // nodeId -> masternode object,
-typedef std::map<CKeyID, uint256> CMasternodesByAuth; // for two indexes, owner->nodeId, operator->nodeId
+//typedef std::map<uint256, CMasternode> CMasternodes;  // nodeId -> masternode object,
+//typedef std::map<CKeyID, uint256> CMasternodesByAuth; // for two indexes, owner->nodeId, operator->nodeId
 
 class CEnhancedCSViewCache;
 class CEnhancedCSViewHistory;
 
 class CEnhancedCSViewOld
 {
-    using RewardTxHash = uint256;
-    using AnchorTxHash = uint256;
+//    using RewardTxHash = uint256;
+//    using AnchorTxHash = uint256;
 public:
-    // Block of typedefs
-    struct CMasternodeIDs
-    {
-        uint256 id;
-        CKeyID operatorAuthAddress;
-        CKeyID ownerAuthAddress;
-    };
-    typedef std::map<int, std::pair<uint256, MasternodesTxType> > CMnTxsUndo; // txn, undoRec
-    typedef std::map<int, CMnTxsUndo> CMnBlocksUndo;
+//    typedef std::map<int, std::pair<uint256, MasternodesTxType> > CMnTxsUndo; // txn, undoRec
+//    typedef std::map<int, CMnTxsUndo> CMnBlocksUndo;
     typedef std::map<uint256, CDoubleSignFact> CMnCriminals; // nodeId, two headers
-    typedef std::map<AnchorTxHash, RewardTxHash> CAnchorsRewards;
-    typedef std::set<CKeyID> CTeam;
-
-    enum class AuthIndex { ByOwner, ByOperator };
 
 protected:
-    int lastHeight;
-    CMasternodes allNodes;
-    CMasternodesByAuth nodesByOwner;
-    CMasternodesByAuth nodesByOperator;
-
     CMnCriminals criminals;
-    CAnchorsRewards rewards;
-    CTeam currentTeam;
-    CAmount foundationsDebt;
 
-    CMnBlocksUndo blocksUndo;
+//    CMnBlocksUndo blocksUndo;
 
-    CEnhancedCSViewOld() : lastHeight(0) {}
+    CEnhancedCSViewOld() {}
 
 public:
     CEnhancedCSViewOld & operator=(CEnhancedCSViewOld const & other) = delete;
 
-    void ApplyCache(CEnhancedCSViewOld const * cache);
-    void Clear();
-
-    bool IsEmpty() const
-    {
-        return allNodes.empty() && nodesByOwner.empty() && nodesByOperator.empty() && blocksUndo.empty();
-    }
+//    void Clear();
 
     virtual ~CEnhancedCSViewOld() {}
-
-    void SetLastHeight(int h)
-    {
-        lastHeight = h;
-    }
-    int GetLastHeight() const
-    {
-        return lastHeight;
-    }
-
-    void IncrementMintedBy(CKeyID const & minter)
-    {
-        auto it = ExistMasternode(AuthIndex::ByOperator, minter);
-        assert(it);
-        auto const & nodeId = (*it)->second;
-        auto nodePtr = ExistMasternode(nodeId);
-        assert(nodePtr);
-        auto & node = allNodes[nodeId] = *nodePtr; // cause may be cached!!
-        ++node.mintedBlocks;
-    }
-
-    void DecrementMintedBy(CKeyID const & minter)
-    {
-        auto it = ExistMasternode(AuthIndex::ByOperator, minter);
-        assert(it);
-        auto const & nodeId = (*it)->second;
-        auto nodePtr = ExistMasternode(nodeId);
-        assert(nodePtr);
-        auto & node = allNodes[nodeId] = *nodePtr; // cause may be cached!!
-        --node.mintedBlocks;
-    }
-
-    virtual CMasternodes GetMasternodes() const
-    {
-        return allNodes;
-    }
-
-    //! Initial load of all data
-    virtual bool Load() { assert(false); }
-    virtual bool Flush() { assert(false); }
-
-    virtual boost::optional<CMasternodesByAuth::const_iterator>
-    ExistMasternode(AuthIndex where, CKeyID const & auth) const;
-
-    virtual CMasternode const * ExistMasternode(uint256 const & id) const;
 
     // "off-chain" data, should be written directly
     virtual void WriteMintedBlockHeader(uint256 const & txid, uint64_t const mintedBlocks, uint256 const & hash, CBlockHeader const & blockHeader, bool fIsFakeNet = true) { assert(false); }
@@ -269,153 +199,36 @@ public:
     virtual void WriteCriminal(uint256 const & mnId, CDoubleSignFact const & doubleSignFact) { assert(false); }
     virtual void EraseCriminal(uint256 const & mnId) { assert(false); }
 
-    bool CanSpend(uint256 const & nodeId, int height) const;
-    bool IsAnchorInvolved(uint256 const & nodeId, int height) const;
+//    bool IsAnchorInvolved(uint256 const & nodeId, int height) const;
 
-    bool OnMasternodeCreate(uint256 const & nodeId, CMasternode const & node, int txn);
-    bool OnMasternodeResign(uint256 const & nodeId, uint256 const & txid, int height, int txn);
-    CEnhancedCSViewCache OnUndoBlock(int height);
+//    CEnhancedCSViewCache OnUndoBlock(int height);
 
     void PruneOlder(int height);
-
-    // Masternodes Teams
-    void SetTeam(CTeam newTeam);
-    const CTeam &GetCurrentTeam();
-    CTeam CalcNextTeam(uint256 stakeModifier, const CMasternodes * masternodes = nullptr);
 
     // Criminals
     void AddCriminalProof(uint256 const & id, CBlockHeader const & blockHeader, CBlockHeader const & conflictBlockHeader);
     void RemoveCriminalProofs(uint256 const &criminalID);
     CMnCriminals GetUnpunishedCriminals() const;
 
-    bool BanCriminal(const uint256 txid, std::vector<unsigned char> & metadata, int height);
-    bool UnbanCriminal(const uint256 txid, std::vector<unsigned char> & metadata);
-
-    // Anchors Rewards
-    virtual RewardTxHash GetRewardForAnchor(AnchorTxHash const &btcTxHash) const
-    {
-        auto it = rewards.find(btcTxHash);
-        return it != rewards.end()? it->second : RewardTxHash{};
-    }
-    virtual CAnchorsRewards ListAnchorRewards() const
-    {
-        return rewards;
-    }
-    void AddRewardForAnchor(AnchorTxHash const &btcTxHash, uint256 const & rewardTxHash);
-    void RemoveRewardForAnchor(AnchorTxHash const &btcTxHash);
-    void CreateAndRelayConfirmMessageIfNeed(const CAnchor & anchor, const uint256 & btcTxHash);
-
-    // FoundationsDebt
-    CAmount GetFoundationsDebt();
-    void SetFoundationsDebt(CAmount debt);
-
-    // Outside
-
 protected:
-    virtual CMnBlocksUndo::mapped_type const & GetBlockUndo(CMnBlocksUndo::key_type key) const;
-
-private:
-    boost::optional<CMasternodeIDs> AmI(AuthIndex where) const;
-public:
-    boost::optional<CMasternodeIDs> AmIOperator() const;
-    boost::optional<CMasternodeIDs> AmIOwner() const;
+//    virtual CMnBlocksUndo::mapped_type const & GetBlockUndo(CMnBlocksUndo::key_type key) const;
 
     friend class CEnhancedCSViewCache;
     friend class CEnhancedCSViewHistory;
 };
 
+//class CEnhancedCSViewHistory : public CEnhancedCSViewCache
+//{
+//protected:
+//    std::map<int, CEnhancedCSViewCache> historyDiff;
 
-class CEnhancedCSViewCache : public CEnhancedCSViewOld
-{
-protected:
-    CEnhancedCSViewOld * base;
+//public:
+//    CEnhancedCSViewHistory(CEnhancedCSViewOld * top) : CEnhancedCSViewCache(top) { assert(top); }
 
-public:
-    CEnhancedCSViewCache(CEnhancedCSViewOld * other)
-        : CEnhancedCSViewOld()
-        , base(other)
-    {
-        assert(base);
-        lastHeight = base->lastHeight;
-        currentTeam = base->currentTeam;
-        foundationsDebt = base->foundationsDebt;
-        // cached items are empty!
-    }
+//    bool Flush() override { assert(false); } // forbidden!!!
 
-    ~CEnhancedCSViewCache() override {}
-
-    CMasternodes GetMasternodes() const override
-    {
-        auto const baseNodes = base->GetMasternodes();
-        CMasternodes result(allNodes);
-        result.insert(baseNodes.begin(), baseNodes.end());
-        return result;
-    }
-
-    RewardTxHash GetRewardForAnchor(AnchorTxHash const &btcTxHash) const override
-    {
-        auto it = rewards.find(btcTxHash);
-        return it != rewards.end()? it->second : base->GetRewardForAnchor(btcTxHash);
-    }
-
-    CAnchorsRewards ListAnchorRewards() const override
-    {
-        auto const baseRewards = base->ListAnchorRewards();
-        CAnchorsRewards result(rewards);
-        result.insert(baseRewards.begin(), baseRewards.end());
-        return result;
-    }
-
-    boost::optional<CMasternodesByAuth::const_iterator>
-    ExistMasternode(AuthIndex where, CKeyID const & auth) const override
-    {
-        CMasternodesByAuth const & index = (where == AuthIndex::ByOwner) ? nodesByOwner : nodesByOperator;
-        auto it = index.find(auth);
-        if (it == index.end())
-        {
-            return base->ExistMasternode(where, auth);
-        }
-        if (it->second.IsNull())
-        {
-            return {};
-        }
-        return {it};
-    }
-
-    CMasternode const * ExistMasternode(uint256 const & id) const override
-    {
-        CMasternodes::const_iterator it = allNodes.find(id);
-        return it == allNodes.end() ? base->ExistMasternode(id) : it->second != CMasternode() ? &it->second : nullptr;
-    }
-
-    CMnBlocksUndo::mapped_type const & GetBlockUndo(CMnBlocksUndo::key_type key) const override
-    {
-        CMnBlocksUndo::const_iterator it = blocksUndo.find(key);
-        return it == blocksUndo.end() ? base->GetBlockUndo(key) : it->second;
-    }
-
-    bool Flush() override
-    {
-        base->ApplyCache(this);
-        Clear();
-
-        return true;
-    }
-};
-
-
-class CEnhancedCSViewHistory : public CEnhancedCSViewCache
-{
-protected:
-    std::map<int, CEnhancedCSViewCache> historyDiff;
-
-public:
-    CEnhancedCSViewHistory(CEnhancedCSViewOld * top) : CEnhancedCSViewCache(top) { assert(top); }
-
-    bool Flush() override { assert(false); } // forbidden!!!
-
-    CEnhancedCSViewHistory & GetState(int targetHeight);
-};
+//    CEnhancedCSViewHistory & GetState(int targetHeight);
+//};
 
 // Prefixes to the masternodes database (masternodes/)
 
@@ -542,6 +355,49 @@ public:
         return {};
     }
 
+    bool OnMasternodeCreate(uint256 const & nodeId, CMasternode const & node, int txn)
+    {
+        // Check auth addresses and that there in no MN with such owner or operator
+        if ((node.operatorType != 1 && node.operatorType != 4 && node.ownerType != 1 && node.ownerType != 4) ||
+            node.ownerAuthAddress.IsNull() || node.operatorAuthAddress.IsNull() ||
+            ExistMasternode(nodeId) ||
+            ExistMasternodeByOwner(node.ownerAuthAddress) ||
+            ExistMasternodeByOperator(node.operatorAuthAddress)
+            ) {
+            return false;
+        }
+
+        WriteBy<ID>(nodeId, node);
+        WriteBy<Owner>(node.ownerAuthAddress, nodeId);
+        WriteBy<Operator>(node.operatorAuthAddress, nodeId);
+
+        // old-style undo
+//        blocksUndo[node.creationHeight][txn] = std::make_pair(nodeId, MasternodesTxType::CreateMasternode);
+
+        return true;
+    }
+
+    bool OnMasternodeResign(uint256 const & nodeId, uint256 const & txid, int height, int txn)
+    {
+        // auth already checked!
+        auto node = ExistMasternode(nodeId);
+        if (!node) {
+            return false;
+        }
+        auto state = node->GetState(height);
+        if ((state != CMasternode::PRE_ENABLED && state != CMasternode::ENABLED) /*|| IsAnchorInvolved(nodeId, height)*/) { // if already spoiled by resign or ban, or need for anchor
+            return false;
+        }
+
+        node->resignTx =  txid;
+        node->resignHeight = height;
+        WriteBy<ID>(nodeId, *node);
+
+        // old-style undo
+//        blocksUndo[height][txn] = std::make_pair(nodeId, MasternodesTxType::ResignMasternode);
+
+        return true;
+    }
 
     // tags
     struct ID { static const unsigned char prefix; };
@@ -605,10 +461,6 @@ public:
         return ReadBy<BtcTx, RewardTxHash>(btcTxHash);
     }
 
-//    virtual CAnchorsRewards ListAnchorRewards() const
-//    {
-//        return rewards;
-//    }
     void AddRewardForAnchor(AnchorTxHash const &btcTxHash, RewardTxHash const & rewardTxHash) {
         WriteBy<BtcTx>(btcTxHash, rewardTxHash);
     }
@@ -646,50 +498,6 @@ public:
     /// @todo newbase move to networking?
     void CreateAndRelayConfirmMessageIfNeed(const CAnchor & anchor, const uint256 & btcTxHash);
 
-    bool OnMasternodeCreate(uint256 const & nodeId, CMasternode const & node, int txn)
-    {
-        // Check auth addresses and that there in no MN with such owner or operator
-        if ((node.operatorType != 1 && node.operatorType != 4 && node.ownerType != 1 && node.ownerType != 4) ||
-            node.ownerAuthAddress.IsNull() || node.operatorAuthAddress.IsNull() ||
-            ExistMasternode(nodeId) ||
-            ExistMasternodeByOwner(node.ownerAuthAddress) ||
-            ExistMasternodeByOperator(node.operatorAuthAddress)
-            ) {
-            return false;
-        }
-
-        WriteBy<ID>(nodeId, node);
-        WriteBy<Owner>(node.ownerAuthAddress, nodeId);
-        WriteBy<Operator>(node.operatorAuthAddress, nodeId);
-
-        /// @todo newbase
-//        blocksUndo[node.creationHeight][txn] = std::make_pair(nodeId, MasternodesTxType::CreateMasternode);
-
-        return true;
-    }
-
-    bool OnMasternodeResign(uint256 const & nodeId, uint256 const & txid, int height, int txn)
-    {
-        // auth already checked!
-        auto node = ExistMasternode(nodeId);
-        if (!node) {
-            return false;
-        }
-        auto state = node->GetState(height);
-        if ((state != CMasternode::PRE_ENABLED && state != CMasternode::ENABLED) /*|| IsAnchorInvolved(nodeId, height)*/) { // if already spoiled by resign or ban, or need for anchor
-            return false;
-        }
-
-        node->resignTx =  txid;
-        node->resignHeight = height;
-        WriteBy<ID>(nodeId, *node);
-
-        /// @todo newbase
-//        blocksUndo[height][txn] = std::make_pair(nodeId, MasternodesTxType::ResignMasternode);
-
-        return true;
-    }
-
     // simplified version of undo, without any unnecessary undo data
     void OnUndoTx(CTransaction const & tx)
     {
@@ -697,15 +505,14 @@ public:
         MasternodesTxType txType = GuessMasternodeTxType(tx, metadata);
 
         uint256 txid = tx.GetHash();
-        switch (txType)
-        {
+        switch (txType) {
             case MasternodesTxType::CreateMasternode:
             {
                 auto node = ExistMasternode(txid);
                 if (node) {
                     EraseBy<ID>(txid);
                     EraseBy<Operator>(node->operatorAuthAddress);
-                    EraseBy<Operator>(node->ownerAuthAddress);
+                    EraseBy<Owner>(node->ownerAuthAddress);
                 }
             }
             break;
@@ -731,9 +538,7 @@ public:
 
 
 /** Global variable that points to the CMasternodeView (should be protected by cs_main) */
-//extern std::unique_ptr<CEnhancedCSView> penhancedview;
 extern std::unique_ptr<CStorageLevelDB> penhancedDB;
-//extern std::unique_ptr<CEnhanced123> penhanced123;
 extern std::unique_ptr<CEnhancedCSView> penhancedview;
 
 #endif // DEFI_MASTERNODES_MASTERNODES_H
