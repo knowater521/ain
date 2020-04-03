@@ -38,25 +38,6 @@ private:
     CEnhancedCSViewDB(CEnhancedCSViewDB const & other) = delete;
     CEnhancedCSViewDB & operator=(CEnhancedCSViewDB const &) = delete;
 
-    template <typename K, typename V>
-    void BatchWrite(const K& key, const V& value)
-    {
-        if (!batch)
-        {
-            batch.reset(new CDBBatch(*db));
-        }
-        batch->Write<K,V>(key, value);
-    }
-    template <typename K>
-    void BatchErase(const K& key)
-    {
-        if (!batch)
-        {
-            batch.reset(new CDBBatch(*db));
-        }
-        batch->Erase<K>(key);
-    }
-
     template <typename Container>
     bool LoadTable(char prefix, Container & data, std::function<void(typename Container::key_type const &, typename Container::mapped_type &)> callback = nullptr)
     {
@@ -87,29 +68,6 @@ private:
     }
 
 protected:
-    void CommitBatch();
-
-    bool ReadHeight(int & h);
-    void WriteHeight(int h);
-
-    void WriteMasternode(uint256 const & txid, CMasternode const & node);
-    void EraseMasternode(uint256 const & txid);
-
-    void WriteCurrentTeam(std::set<CKeyID> const & currentTeam);
-    bool LoadCurrentTeam(std::set<CKeyID> & newTeam);
-    bool EraseCurrentTeam();
-
-    void WriteAnchorReward(uint256 const & anchorHash, uint256 const & rewardTxHash);
-    void EraseAnchorReward(uint256 const & anchorHash);
-
-    void WriteFoundationsDebt(CAmount const foundationsDebt);
-    bool LoadFoundationsDebt();
-
-//    void WriteDeadIndex(int height, uint256 const & txid, char type);
-//    void EraseDeadIndex(int height, uint256 const & txid);
-
-    void WriteUndo(int height, CMnTxsUndo const & undo);
-    void EraseUndo(int height);
 
     // "off-chain" data, should be written directly
     void WriteMintedBlockHeader(uint256 const & txid, uint64_t mintedBlocks, uint256 const & hash, CBlockHeader const & blockHeader, bool fIsFakeNet = true) override;
@@ -120,9 +78,6 @@ protected:
     void WriteCriminal(uint256 const & mnId, CDoubleSignFact const & doubleSignFact) override;
     void EraseCriminal(uint256 const & mnId) override;
 
-public:
-    bool Load() override;
-    bool Flush() override;
 };
 
 #endif // DEFI_MASTERNODES_MN_TXDB_H
