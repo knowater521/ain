@@ -403,23 +403,15 @@ CAnchorIndex::UnrewardedResult CAnchorIndex::GetUnrewarded() const
         confirmed.insert(it->txHash);
     }
 
-    // custom comparator for set_difference
-    struct cmp {
-        bool operator()(uint256 const & a, std::pair<uint256 const, uint256> const & b) const {
-            return a < b.first;
-        }
-        bool operator()(std::pair<uint256 const, uint256> const & a, uint256 const & b) const {
-            return a.first < b;
-        }
-    };
-
     // find unrewarded
-    UnrewardedResult result;
-    /// @todo newbase
-//    auto const rewards = penhancedview->ListAnchorRewards();
-//    std::set_difference(confirmed.begin(), confirmed.end(), rewards.begin(), rewards.end(), std::inserter(result, result.end()), cmp());
+    for (auto && it = confirmed.begin(); it != confirmed.end(); /* no advance */) {
+        if (penhancedview->GetRewardForAnchor(*it))
+            it = confirmed.erase(it);
+        else
+            it++;
+    }
 
-    return result;
+    return confirmed;
 }
 
 int CAnchorIndex::GetAnchorConfirmations(uint256 const & txHash) const

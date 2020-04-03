@@ -276,6 +276,8 @@ void Shutdown(InitInterfaces& interfaces)
         panchorAwaitingConfirms.reset();
         panchorauths.reset();
         penhancedview.reset();
+        penhancedDB.reset();
+        pcriminals.reset();
         pblocktree.reset();
     }
     for (const auto& client : interfaces.chain_clients) {
@@ -1567,15 +1569,13 @@ bool AppInitMain(InitInterfaces& interfaces)
                         "", CClientUIInterface::MSG_ERROR);
                 });
 
-//                penhancedview.reset();
-//                penhancedview = MakeUnique<CEnhancedCSViewDB>(nMinDbCache << 20, false, fReset || fReindexChainState);
-//                penhancedview->Load();
+                pcriminals.reset();
+                pcriminals = MakeUnique<CCriminalsView>(GetDataDir() / "criminals", nMinDbCache << 20, false, fReset || fReindexChainState);
 
                 penhancedDB.reset();
-                penhancedDB = MakeUnique<CStorageLevelDB>(GetDataDir() / "enhancedstate", nMinDbCache << 20, false, fReset || fReindexChainState);
+                penhancedDB = MakeUnique<CStorageLevelDB>(GetDataDir() / "enhancedcs", nMinDbCache << 20, false, fReset || fReindexChainState);
+                penhancedview.reset();
                 penhancedview = MakeUnique<CEnhancedCSView>(*penhancedDB.get());
-//                auto viewcache = MakeUnique<CEnhanced123>(*penhanced123.get());
-//                penhanced123 = MakeUnique<CEnhanced123>(nMinDbCache << 20, false, fReset || fReindexChainState);
 
                 panchorauths.reset();
                 panchorauths = MakeUnique<CAnchorAuthIndex>();

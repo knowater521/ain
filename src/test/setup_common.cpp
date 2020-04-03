@@ -112,12 +112,11 @@ TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(cha
     {
         LOCK(cs_main);
 
-//        penhancedview.reset();
-//        penhancedview = MakeUnique<CEnhancedCSViewDB>(nMinDbCache << 20, true, true);
-//        penhancedview->Load();
-        /// @todo newbase
+        pcriminals.reset();
+        pcriminals = MakeUnique<CCriminalsView>(GetDataDir() / "criminals", nMinDbCache << 20, true, true);
+
         penhancedDB.reset();
-        penhancedDB = MakeUnique<CStorageLevelDB>(GetDataDir() / "enhancedstate", nMinDbCache << 20, true, true);
+        penhancedDB = MakeUnique<CStorageLevelDB>(GetDataDir() / "enhancedcs", nMinDbCache << 20, true, true);
         penhancedview = MakeUnique<CEnhancedCSView>(*penhancedDB.get());
 
         panchorauths.reset();
@@ -161,6 +160,8 @@ TestingSetup::~TestingSetup()
     panchorAwaitingConfirms.reset();
     panchorauths.reset();
     penhancedview.reset();
+    penhancedDB.reset();
+    pcriminals.reset();
 
     pblocktree.reset();
 }
