@@ -435,17 +435,16 @@ UniValue listcriminalproofs(const JSONRPCRequest& request)
     auto locked_chain = pwallet->chain().lock();
 
     UniValue ret(UniValue::VOBJ);
-    /// @todo newbase
-//    auto const proofs = penhancedview->GetUnpunishedCriminals();
-//    for (auto const & proof : proofs) {
-//        UniValue obj(UniValue::VOBJ);
-//        obj.pushKV("hash1", proof.second.blockHeader.GetHash().ToString());
-//        obj.pushKV("height1", proof.second.blockHeader.height);
-//        obj.pushKV("hash2", proof.second.conflictBlockHeader.GetHash().ToString());
-//        obj.pushKV("height2", proof.second.conflictBlockHeader.height);
-//        obj.pushKV("mintedBlocks", proof.second.blockHeader.mintedBlocks);
-//        ret.pushKV(proof.first.ToString(), obj);
-//    }
+    auto const proofs = pcriminals->GetUnpunishedCriminals();
+    for (auto const & proof : proofs) {
+        UniValue obj(UniValue::VOBJ);
+        obj.pushKV("hash1", proof.second.blockHeader.GetHash().ToString());
+        obj.pushKV("height1", proof.second.blockHeader.height);
+        obj.pushKV("hash2", proof.second.conflictBlockHeader.GetHash().ToString());
+        obj.pushKV("height2", proof.second.conflictBlockHeader.height);
+        obj.pushKV("mintedBlocks", proof.second.blockHeader.mintedBlocks);
+        ret.pushKV(proof.first.ToString(), obj);
+    }
     return ret;
 }
 

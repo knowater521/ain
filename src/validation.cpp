@@ -2484,8 +2484,7 @@ bool CChainState::DisconnectTip(CValidationState& state, const CChainParams& cha
             panchorAwaitingConfirms->ReVote();
         }
         for (auto const & cr : disconnectedCriminals) {
-            /// @todo newbase
-//            penhancedview->AddCriminalProof(cr.first, cr.second.blockHeader, cr.second.conflictBlockHeader);
+            pcriminals->AddCriminalProof(cr.first, cr.second.blockHeader, cr.second.conflictBlockHeader);
         }
     }
     LogPrint(BCLog::BENCH, "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * MILLI);
@@ -2634,8 +2633,7 @@ bool CChainState::ConnectTip(CValidationState& state, const CChainParams& chainp
             panchorAwaitingConfirms->ReVote();
         }
         for (auto const & nodeId : bannedCriminals) {
-            /// @todo newbase
-//            penhancedview->RemoveCriminalProofs(nodeId);
+            pcriminals->RemoveCriminalProofs(nodeId);
         }
     }
     int64_t nTime4 = GetTimeMicros(); nTimeFlush += nTime4 - nTime3;
@@ -3740,11 +3738,9 @@ bool BlockManager::AcceptBlockHeader(const CBlockHeader& block, CValidationState
             auto const & nodeId = *it;
 
             std::map <uint256, CBlockHeader> blockHeaders{};
-            /// @todo newbase
-//            penhancedview->FetchMintedHeaders(nodeId, block.mintedBlocks, blockHeaders, fIsFakeNet);
+            pcriminals->FetchMintedHeaders(nodeId, block.mintedBlocks, blockHeaders, fIsFakeNet);
             if (blockHeaders.find(hash) == blockHeaders.end()) {
-                /// @todo newbase
-//                penhancedview->WriteMintedBlockHeader(nodeId, block.mintedBlocks, hash, block, fIsFakeNet);
+                pcriminals->WriteMintedBlockHeader(nodeId, block.mintedBlocks, hash, block, fIsFakeNet);
             }
 
             auto state = penhancedview->ExistMasternode(nodeId)->GetState(block.height);
@@ -3752,8 +3748,7 @@ bool BlockManager::AcceptBlockHeader(const CBlockHeader& block, CValidationState
                 for (std::pair <uint256, CBlockHeader> const & blockHeader : blockHeaders) {
                     if (IsDoubleSignRestricted(block.height, blockHeader.second.height)) { // we already have equal minters and even mintedBlocks counter
                         // this is the ONLY place
-                        /// @todo newbase
-//                        penhancedview->AddCriminalProof(nodeId, block, blockHeader.second);
+                        pcriminals->AddCriminalProof(nodeId, block, blockHeader.second);
                     }
                 }
             }
@@ -4559,7 +4554,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
         if (nCheckLevel >= 3 && (coins.DynamicMemoryUsage() + ::ChainstateActive().CoinsTip().DynamicMemoryUsage()) <= nCoinCacheUsage) {
             assert(coins.GetBestBlock() == pindex->GetBlockHash());
             std::vector<CAnchorConfirmMessage> disconnectedConfirms; // dummy
-            CEnhancedCSViewOld::CMnCriminals disconnectedCriminals; // dummy
+            CCriminalProofsView::CMnCriminals disconnectedCriminals; // dummy
             DisconnectResult res = ::ChainstateActive().DisconnectBlock(block, pindex, coins, mnview, disconnectedConfirms, disconnectedCriminals);
             if (res == DISCONNECT_FAILED) {
                 return error("VerifyDB(): *** irrecoverable inconsistency in block data at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
@@ -4676,7 +4671,7 @@ bool CChainState::ReplayBlocks(const CChainParams& params, CCoinsView* view, CEn
             }
             LogPrintf("Rolling back %s (%i)\n", pindexOld->GetBlockHash().ToString(), pindexOld->nHeight);
             std::vector<CAnchorConfirmMessage> disconnectedConfirms; // dummy
-            CEnhancedCSViewOld::CMnCriminals disconnectedCriminals; // dummy
+            CCriminalProofsView::CMnCriminals disconnectedCriminals; // dummy
             DisconnectResult res = DisconnectBlock(block, pindexOld, cache, mncache, disconnectedConfirms, disconnectedCriminals);
             if (res == DISCONNECT_FAILED) {
                 return error("RollbackBlock(): DisconnectBlock failed at %d, hash=%s", pindexOld->nHeight, pindexOld->GetBlockHash().ToString());
