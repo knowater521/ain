@@ -27,7 +27,7 @@ static void BytesToDbType(const TBytes& bytes, T& value) {
     try {
         CDataStream stream(bytes, SER_DISK, CLIENT_VERSION);
         stream >> value;
-        assert(stream.size() == 0);
+//        assert(stream.size() == 0); // will fail with partial key matching
     }
     catch (std::ios_base::failure&) {
     }
@@ -37,7 +37,7 @@ static void BytesToDbType(const TBytes& bytes, T& value) {
 class CStorageKVIterator {
 public:
     virtual ~CStorageKVIterator() {};
-    virtual void Seek(const TBytes& key, size_t key_size) = 0;
+    virtual void Seek(const TBytes& key) = 0;
     virtual void Next() = 0;
     virtual bool Valid() = 0;
     virtual TBytes Key() = 0;
@@ -61,47 +61,26 @@ class CStorageLevelDBIterator : public CStorageKVIterator {
 public:
     explicit CStorageLevelDBIterator(std::unique_ptr<CDBIterator>&& it) : it{std::move(it)} { }
     ~CStorageLevelDBIterator() override { }
-    void Seek(const TBytes& key, size_t size) override {
-//        CDataStream ssKey(SER_DISK, CLIENT_VERSION);
-//        ssKey.reserve(ssKey.GetSerializeSize(key));
-//        ssKey << key;
-//        leveldb::Slice slKey(&ssKey[0], ssKey.size());
-//        it->Seek(slKey);
-        prefix = key;
-        key_size = size;
-        TBytes searchkey(key);
-        searchkey.resize(key_size, 0);
-        it->Seek(searchkey); // lower_bound in fact
+    void Seek(const TBytes& key) override {
+        it->Seek(key); // lower_bound in fact
     }
     void Next() override { it->Next(); }
     bool Valid() override {
-        TBytes dummy;
-        return it->Valid() && it->GetKey(dummy) && dummy.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), dummy.begin());
+        return it->Valid();
     }
     TBytes Key() override {
         TBytes result;
         return (it->GetKey(result)) ? result : TBytes{};
-//        return ExtractSlice(it->key());
     }
     TBytes Value() override {
         TBytes result;
         return (it->GetValue(result)) ? result : TBytes{};
-//        return ExtractSlice(it->value());
     }
 private:
     std::unique_ptr<CDBIterator> it;
-    TBytes prefix;
-    size_t key_size;
     // No copying allowed
     CStorageLevelDBIterator(const CStorageLevelDBIterator&);
     void operator=(const CStorageLevelDBIterator&);
-
-//    TBytes ExtractSlice(const leveldb::Slice& s) {
-//        TBytes v;
-//        CDataStream stream(s.data(), s.data() + s.size(), SER_DISK, CLIENT_VERSION);
-//        stream >> v;
-//        return v;
-//    }
 };
 
 // LevelDB glue layer storage
@@ -158,17 +137,12 @@ public:
     CFlushableStorageKVIterator(const CFlushableStorageKVIterator&) = delete;
     void operator=(const CFlushableStorageKVIterator&) = delete;
     ~CFlushableStorageKVIterator() override { }
-    void Seek(const TBytes& key, size_t key_size) override {
+    void Seek(const TBytes& key) override {
         prevKey.clear();
-        pIt->Seek(key, key_size);
+        pIt->Seek(key);
         parentOk = pIt->Valid();
-        TBytes lowerbound(key);
-        lowerbound.resize(key_size, 0);
-        TBytes upperbound(key);
-        upperbound.resize(key_size, 0xff);
-        mIt = map.lower_bound(lowerbound);
-        mEnd = map.upper_bound(upperbound);
-        mapOk = mIt != mEnd;
+        mIt = map.lower_bound(key);
+        mapOk = mIt != map.end();
         inited = true;
         Next();
     }
@@ -194,7 +168,7 @@ public:
                     }
                     if (mapOk) {
                         mIt++;
-                        mapOk = mIt != mEnd;   //map.end();
+                        mapOk = mIt != map.end();
                     }
                     if (ok) return;
                 }
@@ -229,7 +203,6 @@ private:
     bool parentOk;
     MapKV& map;
     MapKV::iterator mIt;
-    MapKV::iterator mEnd;
     bool mapOk;
     TBytes key;
     TBytes value;
@@ -368,35 +341,21 @@ public:
 
     /// @todo constness??
     template<typename By, typename KeyType, typename ValueType>
-    bool ForEach(std::function<bool(KeyType const &, ValueType &)> callback) {
+    bool ForEach(std::function<bool(KeyType const &, ValueType &)> callback, KeyType hint = KeyType()) {
 
         using pref_type = typename std::remove_const<decltype( By::prefix )>::type;
-        std::pair<pref_type, KeyType> key;
+        auto key = std::make_pair<pref_type, KeyType>(pref_type(By::prefix), hint);
 //            std::pair<char, KeyType> key; // failsafe
 
         auto it = DB().NewIterator();
-        for(it->Seek(DbTypeToBytes(By::prefix), GetSerializeSize(key)); it->Valid(); it->Next()) {
+        for(it->Seek(DbTypeToBytes(key)); it->Valid() && (BytesToDbType(it->Key(), key), key.first == By::prefix); it->Next()) {
             boost::this_thread::interruption_point();
 
-//            TBytes keyBytes(it->Key());
-//            LogPrintf("forEachKey:___ %s\n", HexStr(keyBytes).c_str());
-            BytesToDbType(it->Key(), key); // can fail
-//            if (key.first == By::prefix) {
+            ValueType value;
+            BytesToDbType(it->Value(), value);
 
-                TBytes valueBytes = it->Value();
-                if (valueBytes.size()) {
-                    ValueType value;
-                    BytesToDbType(valueBytes, value);
-
-                    if (!callback(key.second, value))
-                        break;
-
-                } else {
-                    return error("ForEach() : unable to read value");
-                }
-//            } else {
-//                break;
-//            }
+            if (!callback(key.second, value))
+                break;
         }
         return true;
     }
