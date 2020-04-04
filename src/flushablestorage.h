@@ -5,10 +5,7 @@
 #ifndef FLUSHABLE_STORAGE_H
 #define FLUSHABLE_STORAGE_H
 
-#include <util/system.h>
-#include <memory>
 #include <dbwrapper.h>
-#include <streams.h>
 #include <boost/optional.hpp>
 #include <boost/scoped_ptr.hpp>
 

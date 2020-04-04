@@ -46,7 +46,7 @@ bool CheckHeaderSignature(const CBlockHeader& blockHeader) {
     return true;
 }
 
-bool ContextualCheckProofOfStake(const CBlockHeader& blockHeader, const Consensus::Params& params, CEnhancedCSView* mnView) {
+bool ContextualCheckProofOfStake(const CBlockHeader& blockHeader, const Consensus::Params& params, CCustomCSView* mnView) {
     /// @todo may be this is tooooo optimistic? need more validation?
     if (blockHeader.height == 0 && blockHeader.GetHash() == params.hashGenesisBlock) {
         return true;
@@ -91,7 +91,7 @@ bool ContextualCheckProofOfStake(const CBlockHeader& blockHeader, const Consensu
     return CheckHeaderSignature(blockHeader);
 }
 
-bool CheckProofOfStake(const CBlockHeader& blockHeader, const CBlockIndex* pindexPrev, const Consensus::Params& params, CEnhancedCSView* mnView) {
+bool CheckProofOfStake(const CBlockHeader& blockHeader, const CBlockIndex* pindexPrev, const Consensus::Params& params, CCustomCSView* mnView) {
     if (!pos::CheckStakeModifier(pindexPrev, blockHeader)) {
         return false;
     }
@@ -190,7 +190,7 @@ boost::optional<std::string> CheckSignedBlock(const std::shared_ptr<CBlock>& pbl
     uint256 hashBlock = pblock->GetHash();
 
     // verify hash target and signature of coinstake tx
-    if (!pos::CheckProofOfStake(*(CBlockHeader*)pblock.get(), pindexPrev,  chainparams.GetConsensus(), penhancedview.get()))
+    if (!pos::CheckProofOfStake(*(CBlockHeader*)pblock.get(), pindexPrev,  chainparams.GetConsensus(), pcustomcsview.get()))
         return {std::string{} + "proof-of-stake checking failed"};
 
     LogPrint(BCLog::STAKING, "new proof-of-stake block found hash: %s\n", hashBlock.GetHex());
