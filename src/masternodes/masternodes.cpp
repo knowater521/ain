@@ -4,10 +4,12 @@
 
 #include <masternodes/masternodes.h>
 #include <masternodes/anchors.h>
+#include <masternodes/criminals.h>
+#include <masternodes/mn_checks.h>
 
-//#include <chainparams.h>
+#include <chainparams.h>
 #include <net_processing.h>
-#include <primitives/block.h>
+//#include <primitives/block.h>
 #include <primitives/transaction.h>
 #include <script/script.h>
 #include <script/standard.h>
@@ -17,17 +19,22 @@
 #include <algorithm>
 #include <functional>
 
-std::unique_ptr<CEnhancedCSView> penhancedview;
+// Prefixes to the masternodes database (masternodes/)
+const unsigned char DB_MASTERNODES = 'M';     // main masternodes table
+const unsigned char DB_MN_OPERATORS = 'o';    // masternodes' operators index
+const unsigned char DB_MN_OWNERS = 'w';       // masternodes' owners index
+const unsigned char DB_MN_HEIGHT = 'H';       // single record with last processed chain height
+const unsigned char DB_MN_ANCHOR_REWARD = 'r';
+const unsigned char DB_MN_CURRENT_TEAM = 't';
+const unsigned char DB_MN_FOUNDERS_DEBT = 'd';
 
-std::unique_ptr<CStorageLevelDB> penhancedDB;
+const unsigned char CMasternodesView::ID      ::prefix = DB_MASTERNODES;
+const unsigned char CMasternodesView::Operator::prefix = DB_MN_OPERATORS;
+const unsigned char CMasternodesView::Owner   ::prefix = DB_MN_OWNERS;
+const unsigned char CAnchorRewardsView::BtcTx ::prefix = DB_MN_ANCHOR_REWARD;
 
-std::unique_ptr<CCriminalsView> pcriminals;
-
-static const std::map<char, MasternodesTxType> MasternodesTxTypeToCode =
-{
-    {'C', MasternodesTxType::CreateMasternode },
-    {'R', MasternodesTxType::ResignMasternode }
-};
+std::unique_ptr<CCustomCSView> pcustomcsview;
+std::unique_ptr<CStorageLevelDB> pcustomcsDB;
 
 int GetMnActivationDelay()
 {
@@ -199,165 +206,19 @@ bool operator!=(CDoubleSignFact const & a, CDoubleSignFact const & b)
 }
 
 /*
- * Searching MN index 'nodesByOwner' or 'nodesByOperator' for given 'auth' key
- */
-//boost::optional<CMasternodesByAuth::const_iterator>
-//CEnhancedCSViewOld::ExistMasternode(CEnhancedCSViewOld::AuthIndex where, CKeyID const & auth) const
-//{
-//    CMasternodesByAuth const & index = (where == AuthIndex::ByOwner) ? nodesByOwner : nodesByOperator;
-//    auto it = index.find(auth);
-//    if (it == index.end() || it->second.IsNull())
-//    {
-//        return {};
-//    }
-//    return {it};
-//}
-
-/*
- * Searching all masternodes for given 'id'
- */
-//CMasternode const * CEnhancedCSViewOld::ExistMasternode(uint256 const & id) const
-//{
-//    CMasternodes::const_iterator it = allNodes.find(id);
-//    return it != allNodes.end() && it->second != CMasternode() ? &it->second : nullptr;
-//}
-
-/*
- * Check that given tx is not a masternode id or masternode was resigned enough time in the past
- */
-//bool CEnhancedCSViewOld::CanSpend(const uint256 & nodeId, int height) const
-//{
-//    auto nodePtr = ExistMasternode(nodeId);
-//    // if not exist or (resigned && delay passed)
-//    return !nodePtr || (nodePtr->GetState(height) == CMasternode::RESIGNED) || (nodePtr->GetState(height) == CMasternode::BANNED);
-//}
-
-/*
  * Check that given node is involved in anchor's subsystem for a given height (or smth like that)
  */
-//bool CEnhancedCSViewOld::IsAnchorInvolved(const uint256 & nodeId, int height) const
+//bool IsAnchorInvolved(const uint256 & nodeId, int height) const
 //{
 //    /// @todo to be implemented
 //    return false;
 //}
 
 
-bool ExtractCriminalProofFromTx(CTransaction const & tx, std::vector<unsigned char> & metadata)
-{
-    if (!tx.IsCoinBase() || tx.vout.size() == 0) {
-        return false;
-    }
-    CScript const & memo = tx.vout[0].scriptPubKey;
-    CScript::const_iterator pc = memo.begin();
-    opcodetype opcode;
-    if (!memo.GetOp(pc, opcode) || opcode != OP_RETURN) {
-        return false;
-    }
-    if (!memo.GetOp(pc, opcode, metadata) ||
-        (opcode > OP_PUSHDATA1 &&
-         opcode != OP_PUSHDATA2 &&
-         opcode != OP_PUSHDATA4) ||
-        metadata.size() < DfCriminalTxMarker.size() + 1 ||
-        memcmp(&metadata[0], &DfCriminalTxMarker[0], DfCriminalTxMarker.size()) != 0) {
-        return false;
-    }
-    metadata.erase(metadata.begin(), metadata.begin() + DfCriminalTxMarker.size());
-    return true;
-}
-
-bool ExtractAnchorRewardFromTx(CTransaction const & tx, std::vector<unsigned char> & metadata)
-{
-    if (tx.vout.size() != 2) {
-        return false;
-    }
-    CScript const & memo = tx.vout[0].scriptPubKey;
-    CScript::const_iterator pc = memo.begin();
-    opcodetype opcode;
-    if (!memo.GetOp(pc, opcode) || opcode != OP_RETURN) {
-        return false;
-    }
-    if (!memo.GetOp(pc, opcode, metadata) ||
-        (opcode > OP_PUSHDATA1 &&
-         opcode != OP_PUSHDATA2 &&
-         opcode != OP_PUSHDATA4) ||
-        metadata.size() < DfAnchorFinalizeTxMarker.size() + 1 ||
-        memcmp(&metadata[0], &DfAnchorFinalizeTxMarker[0], DfAnchorFinalizeTxMarker.size()) != 0) {
-        return false;
-    }
-    metadata.erase(metadata.begin(), metadata.begin() + DfAnchorFinalizeTxMarker.size());
-    return true;
-}
-
-
 /*
- * Checks if given tx is probably one of 'MasternodeTx', returns tx type and serialized metadata in 'data'
-*/
-MasternodesTxType GuessMasternodeTxType(CTransaction const & tx, std::vector<unsigned char> & metadata)
-{
-    if (tx.vout.size() == 0)
-    {
-        return MasternodesTxType::None;
-    }
-    CScript const & memo = tx.vout[0].scriptPubKey;
-    CScript::const_iterator pc = memo.begin();
-    opcodetype opcode;
-    if (!memo.GetOp(pc, opcode) || opcode != OP_RETURN)
-    {
-        return MasternodesTxType::None;
-    }
-    if (!memo.GetOp(pc, opcode, metadata) ||
-            (opcode > OP_PUSHDATA1 &&
-             opcode != OP_PUSHDATA2 &&
-             opcode != OP_PUSHDATA4) ||
-            metadata.size() < DfTxMarker.size() + 1 ||     // i don't know how much exactly, but at least MnTxSignature + type prefix
-            memcmp(&metadata[0], &DfTxMarker[0], DfTxMarker.size()) != 0)
-    {
-        return MasternodesTxType::None;
-    }
-    auto const & it = MasternodesTxTypeToCode.find(metadata[DfTxMarker.size()]);
-    if (it == MasternodesTxTypeToCode.end())
-    {
-        return MasternodesTxType::None;
-    }
-    metadata.erase(metadata.begin(), metadata.begin() + DfTxMarker.size() + 1);
-    return it->second;
-}
-
-bool IsDoubleSignRestricted(uint64_t height1, uint64_t height2)
-{
-    return (std::max(height1, height2) - std::min(height1, height2)) <= DOUBLE_SIGN_MINIMUM_PROOF_INTERVAL;
-}
-
-bool IsDoubleSigned(CBlockHeader const & oneHeader, CBlockHeader const & twoHeader, CKeyID & minter)
-{
-    // not necessary to check if such masternode exists or active. this is proof by itself!
-    CKeyID firstKey, secondKey;
-    if (!oneHeader.ExtractMinterKey(firstKey) || !twoHeader.ExtractMinterKey(secondKey)) {
-        return false;
-    }
-
-    if (IsDoubleSignRestricted(oneHeader.height, twoHeader.height) &&
-        firstKey == secondKey &&
-        oneHeader.mintedBlocks == twoHeader.mintedBlocks &&
-        oneHeader.GetHash() != twoHeader.GetHash()
-        ) {
-        minter = firstKey;
-        return true;
-    }
-    return false;
-}
-
-const unsigned char CMasternodesView::ID      ::prefix = DB_MASTERNODES;
-const unsigned char CMasternodesView::Operator::prefix = DB_MN_OPERATORS;
-const unsigned char CMasternodesView::Owner   ::prefix = DB_MN_OWNERS;
-const unsigned char CAnchorRewardsView::BtcTx ::prefix = DB_MN_ANCHOR_REWARD;
-
-const unsigned char CMintedHeadersView::MintedHeaders ::prefix = DB_MN_BLOCK_HEADERS;
-const unsigned char CCriminalProofsView::Proofs       ::prefix = DB_MN_CRIMINALS;
-
-
-
-CTeamView::CTeam CEnhancedCSView::CalcNextTeam(const uint256 & stakeModifier)
+ *  CCustomCSView
+ */
+CTeamView::CTeam CCustomCSView::CalcNextTeam(const uint256 & stakeModifier)
 {
     int anchoringTeamSize = Params().GetConsensus().mn.anchoringTeamSize;
 
@@ -381,8 +242,9 @@ CTeamView::CTeam CEnhancedCSView::CalcNextTeam(const uint256 & stakeModifier)
 }
 
 /// @todo newbase move to networking?
-void CEnhancedCSView::CreateAndRelayConfirmMessageIfNeed(const CAnchor & anchor, const uint256 & btcTxHash)
+void CCustomCSView::CreateAndRelayConfirmMessageIfNeed(const CAnchor & anchor, const uint256 & btcTxHash)
 {
+    /// @todo refactor to use AmISignerNow()
     auto myIDs = AmIOperator();
     if (!myIDs || !ExistMasternode(myIDs->second)->IsActive())
         return ;
@@ -418,4 +280,279 @@ void CEnhancedCSView::CreateAndRelayConfirmMessageIfNeed(const CAnchor & anchor,
         LogPrintf("AnchorConfirms::CreateAndRelayConfirmMessageIfNeed: Warning! not need relay %s because message (or vote!) already exist\n", confirmMessage.GetHash().GetHex());
     }
 
+}
+
+/// @todo refactor to split dependencies
+void CCustomCSView::OnUndoTx(const CTransaction & tx)
+{
+    TBytes metadata;
+    CustomTxType txType = GuessCustomTxType(tx, metadata);
+
+    uint256 txid = tx.GetHash();
+    switch (txType) {
+        case CustomTxType::CreateMasternode:
+        {
+            UnCreateMasternode(txid);
+        }
+        break;
+        case CustomTxType::ResignMasternode:
+        {
+            uint256 nodeId(metadata);
+            UnResignMasternode(nodeId, txid);
+        }
+        break;
+        default:
+        break;
+    }
+}
+
+/*
+ *  CMasternodesView
+ */
+boost::optional<CMasternode> CMasternodesView::ExistMasternode(const uint256 & id) const
+{
+    return ReadBy<ID, CMasternode>(id);
+}
+
+boost::optional<uint256> CMasternodesView::ExistMasternodeByOperator(const CKeyID & id) const
+{
+    return ReadBy<Operator, uint256>(id);
+}
+
+boost::optional<uint256> CMasternodesView::ExistMasternodeByOwner(const CKeyID & id) const
+{
+    return ReadBy<Owner, uint256>(id);
+}
+
+void CMasternodesView::ForEachMasternode(std::function<bool (const uint256 &, CMasternode &)> callback)
+{
+    ForEach<ID, uint256, CMasternode>(callback);
+}
+
+bool CMasternodesView::CanSpend(const uint256 & nodeId, int height) const
+{
+    auto node = ExistMasternode(nodeId);
+    // if not exist or (resigned && delay passed)
+    return !node || (node->GetState(height) == CMasternode::RESIGNED) || (node->GetState(height) == CMasternode::BANNED);
+}
+
+void CMasternodesView::IncrementMintedBy(const CKeyID & minter)
+{
+    auto nodeId = ExistMasternodeByOperator(minter);
+    assert(nodeId);
+    auto node = ExistMasternode(*nodeId);
+    assert(node);
+    ++node->mintedBlocks;
+    WriteBy<ID>(*nodeId, *node);
+}
+
+void CMasternodesView::DecrementMintedBy(const CKeyID & minter)
+{
+    auto nodeId = ExistMasternodeByOperator(minter);
+    assert(nodeId);
+    auto node = ExistMasternode(*nodeId);
+    assert(node);
+    --node->mintedBlocks;
+    WriteBy<ID>(*nodeId, *node);
+}
+
+bool CMasternodesView::BanCriminal(const uint256 txid, std::vector<unsigned char> & metadata, int height)
+{
+    std::pair<CBlockHeader, CBlockHeader> criminal;
+    uint256 nodeId;
+    CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
+    ss >> criminal.first >> criminal.second >> nodeId; // mnid is totally unnecessary!
+
+    CKeyID minter;
+    if (IsDoubleSigned(criminal.first, criminal.second, minter)) {
+        auto node = ExistMasternode(nodeId);
+        if (node && node->operatorAuthAddress == minter && node->banTx.IsNull()) {
+            node->banTx = txid;
+            node->banHeight = height;
+            WriteBy<ID>(nodeId, *node);
+
+            return true;
+        }
+    }
+    return false;
+}
+
+bool CMasternodesView::UnbanCriminal(const uint256 txid, std::vector<unsigned char> & metadata)
+{
+    std::pair<CBlockHeader, CBlockHeader> criminal;
+    uint256 nodeId;
+    CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
+    ss >> criminal.first >> criminal.second >> nodeId; // mnid is totally unnecessary!
+
+    // there is no need to check doublesigning or smth, we just rolling back previously approved (or ignored) banTx!
+    auto node = ExistMasternode(nodeId);
+    if (node && node->banTx == txid) {
+        node->banTx = {};
+        node->banHeight = -1;
+        WriteBy<ID>(nodeId, *node);
+        return true;
+    }
+    return false;
+}
+
+boost::optional<std::pair<CKeyID, uint256> > CMasternodesView::AmIOperator() const
+{
+    CTxDestination dest = DecodeDestination(gArgs.GetArg("-masternode_operator", ""));
+    CKeyID const authAddress = dest.which() == 1 ? CKeyID(*boost::get<PKHash>(&dest)) : (dest.which() == 4 ? CKeyID(*boost::get<WitnessV0KeyHash>(&dest)) : CKeyID());
+    if (!authAddress.IsNull()) {
+        auto nodeId = ExistMasternodeByOperator(authAddress);
+        if (nodeId)
+            return { std::make_pair(authAddress, *nodeId) };
+    }
+    return {};
+}
+
+boost::optional<std::pair<CKeyID, uint256> > CMasternodesView::AmIOwner() const
+{
+    CTxDestination dest = DecodeDestination(gArgs.GetArg("-masternode_owner", ""));
+    CKeyID const authAddress = dest.which() == 1 ? CKeyID(*boost::get<PKHash>(&dest)) : (dest.which() == 4 ? CKeyID(*boost::get<WitnessV0KeyHash>(&dest)) : CKeyID());
+    if (!authAddress.IsNull()) {
+        auto nodeId = ExistMasternodeByOwner(authAddress);
+        if (nodeId)
+            return { std::make_pair(authAddress, *nodeId) };
+    }
+    return {};
+}
+
+bool CMasternodesView::CreateMasternode(const uint256 & nodeId, const CMasternode & node, int txn)
+{
+    // Check auth addresses and that there in no MN with such owner or operator
+    if ((node.operatorType != 1 && node.operatorType != 4 && node.ownerType != 1 && node.ownerType != 4) ||
+        node.ownerAuthAddress.IsNull() || node.operatorAuthAddress.IsNull() ||
+        ExistMasternode(nodeId) ||
+        ExistMasternodeByOwner(node.ownerAuthAddress) ||
+        ExistMasternodeByOperator(node.operatorAuthAddress)
+        ) {
+        return false;
+    }
+
+    WriteBy<ID>(nodeId, node);
+    WriteBy<Owner>(node.ownerAuthAddress, nodeId);
+    WriteBy<Operator>(node.operatorAuthAddress, nodeId);
+
+    // old-style undo
+    //        blocksUndo[node.creationHeight][txn] = std::make_pair(nodeId, MasternodesTxType::CreateMasternode);
+
+    return true;
+}
+
+bool CMasternodesView::ResignMasternode(const uint256 & nodeId, const uint256 & txid, int height, int txn)
+{
+    // auth already checked!
+    auto node = ExistMasternode(nodeId);
+    if (!node) {
+        return false;
+    }
+    auto state = node->GetState(height);
+    if ((state != CMasternode::PRE_ENABLED && state != CMasternode::ENABLED) /*|| IsAnchorInvolved(nodeId, height)*/) { // if already spoiled by resign or ban, or need for anchor
+        return false;
+    }
+
+    node->resignTx =  txid;
+    node->resignHeight = height;
+    WriteBy<ID>(nodeId, *node);
+
+    // old-style undo
+    //        blocksUndo[height][txn] = std::make_pair(nodeId, MasternodesTxType::ResignMasternode);
+
+    return true;
+}
+
+void CMasternodesView::UnCreateMasternode(const uint256 & nodeId)
+{
+    auto node = ExistMasternode(nodeId);
+    if (node) {
+        EraseBy<ID>(nodeId);
+        EraseBy<Operator>(node->operatorAuthAddress);
+        EraseBy<Owner>(node->ownerAuthAddress);
+    }
+}
+
+void CMasternodesView::UnResignMasternode(const uint256 & nodeId, const uint256 & resignTx)
+{
+    auto node = ExistMasternode(nodeId);
+    if (node && node->resignTx == resignTx) {
+        node->resignHeight = -1;
+        node->resignTx = {};
+        WriteBy<ID>(nodeId, *node);
+    }
+}
+
+/*
+ *  CLastHeightView
+ */
+int CLastHeightView::GetLastHeight() const
+{
+    int result;
+    if (Read(DB_MN_HEIGHT, result))
+        return result;
+    return 0;
+}
+
+void CLastHeightView::SetLastHeight(int height)
+{
+    Write(DB_MN_HEIGHT, height);
+}
+
+/*
+ *  CFoundationsDebtView
+ */
+CAmount CFoundationsDebtView::GetFoundationsDebt() const
+{
+    CAmount debt(0);
+    if(Read(DB_MN_FOUNDERS_DEBT, debt))
+        assert(debt >= 0);
+    return debt;
+}
+
+void CFoundationsDebtView::SetFoundationsDebt(CAmount debt)
+{
+    assert(debt >= 0);
+    Write(DB_MN_FOUNDERS_DEBT, debt);
+}
+
+
+/*
+ *  CTeamView
+ */
+void CTeamView::SetTeam(const CTeamView::CTeam & newTeam)
+{
+    Write(DB_MN_CURRENT_TEAM, newTeam);
+}
+
+CTeamView::CTeam CTeamView::GetCurrentTeam() const
+{
+    CTeam team;
+    if (Read(DB_MN_CURRENT_TEAM, team) && team.size() > 0)
+        return team;
+
+    return Params().GetGenesisTeam();
+}
+
+/*
+ *  CAnchorRewardsView
+ */
+boost::optional<CAnchorRewardsView::RewardTxHash> CAnchorRewardsView::GetRewardForAnchor(const CAnchorRewardsView::AnchorTxHash & btcTxHash) const
+{
+    return ReadBy<BtcTx, RewardTxHash>(btcTxHash);
+}
+
+void CAnchorRewardsView::AddRewardForAnchor(const CAnchorRewardsView::AnchorTxHash & btcTxHash, const CAnchorRewardsView::RewardTxHash & rewardTxHash)
+{
+    WriteBy<BtcTx>(btcTxHash, rewardTxHash);
+}
+
+void CAnchorRewardsView::RemoveRewardForAnchor(const CAnchorRewardsView::AnchorTxHash & btcTxHash)
+{
+    EraseBy<BtcTx>(btcTxHash);
+}
+
+void CAnchorRewardsView::ForEachAnchorReward(std::function<bool (const CAnchorRewardsView::AnchorTxHash &, CAnchorRewardsView::RewardTxHash &)> callback)
+{
+    ForEach<BtcTx, AnchorTxHash, RewardTxHash>(callback);
 }

@@ -157,7 +157,7 @@ DEFI_CORE_H = \
   masternodes/anchors.h \
   masternodes/masternodes.h \
   masternodes/mn_checks.h \
-  masternodes/mn_txdb.h \
+  masternodes/criminals.h \
   memusage.h \
   merkleblock.h \
   miner.h \
@@ -293,7 +293,7 @@ libdefi_server_a_SOURCES = \
   masternodes/anchors.cpp \
   masternodes/masternodes.cpp \
   masternodes/mn_checks.cpp \
-  masternodes/mn_txdb.cpp \
+  masternodes/criminals.cpp \
   masternodes/mn_rpc.cpp \
   miner.cpp \
   net.cpp \

@@ -1,6 +1,7 @@
 #include <chainparams.h>
 #include <consensus/merkle.h>
 #include <consensus/validation.h>
+#include <masternodes/criminals.h>
 #include <masternodes/masternodes.h>
 #include <miner.h>
 #include <pos.h>

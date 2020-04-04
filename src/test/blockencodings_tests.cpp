@@ -50,7 +50,7 @@ static CBlock BuildBlockTestCase() {
         LOCK(cs_main);
         tip = ::ChainActive().Tip();
 
-        auto nodePtr = penhancedview->ExistMasternode(masternodeID);
+        auto nodePtr = pcustomcsview->ExistMasternode(masternodeID);
         if (!nodePtr || !nodePtr->IsActive(tip->height))
             return {};
 

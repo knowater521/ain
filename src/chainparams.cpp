@@ -7,7 +7,8 @@
 
 #include <chainparamsseeds.h>
 #include <consensus/merkle.h>
-#include <masternodes/masternodes.h>
+//#include <masternodes/masternodes.h>
+#include <masternodes/mn_checks.h>
 #include <streams.h>
 #include <tinyformat.h>
 #include <util/system.h>
@@ -39,7 +40,7 @@ std::vector<CTransactionRef> CChainParams::CreateGenesisMasternodes()
         CKeyID operatorAuthKey = operatorDest.which() == 1 ? CKeyID(*boost::get<PKHash>(&operatorDest)) : CKeyID(*boost::get<WitnessV0KeyHash>(&operatorDest)) ;
         genesisTeam.insert(operatorAuthKey);
         CDataStream metadata(DfTxMarker, SER_NETWORK, PROTOCOL_VERSION);
-        metadata << static_cast<unsigned char>(MasternodesTxType::CreateMasternode)
+        metadata << static_cast<unsigned char>(CustomTxType::CreateMasternode)
                  << static_cast<char>(operatorDest.which()) << operatorAuthKey;
 
         CScript scriptMeta;
