@@ -14,7 +14,9 @@
 #include <consensus/tx_verify.h>
 #include <consensus/validation.h>
 #include <masternodes/anchors.h>
+#include <masternodes/criminals.h>
 #include <masternodes/masternodes.h>
+#include <masternodes/mn_checks.h>
 #include <net.h>
 #include <policy/feerate.h>
 #include <policy/policy.h>
@@ -110,10 +112,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     LOCK2(cs_main, mempool.cs);
     // in fact, this may be redundant cause it was checked upthere in the miner
-    auto myIDs = penhancedview->AmIOperator();
+    auto myIDs = pcustomcsview->AmIOperator();
     if (!myIDs)
         return nullptr;
-    auto nodePtr = penhancedview->ExistMasternode(myIDs->second);
+    auto nodePtr = pcustomcsview->ExistMasternode(myIDs->second);
     if (!nodePtr || !nodePtr->IsActive())
         return nullptr;
 
@@ -145,7 +147,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     // transaction (which in most cases can be a no-op).
     fIncludeWitness = IsWitnessEnabled(pindexPrev, chainparams.GetConsensus());
 
-    auto currentTeam = penhancedview->GetCurrentTeam();
+    auto currentTeam = pcustomcsview->GetCurrentTeam();
     auto confirms = panchorAwaitingConfirms->GetQuorumFor(currentTeam);
     if (confirms.size() > 0) { // quorum or zero
 
@@ -157,7 +159,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         CTxDestination destination = confirm.rewardKeyType == 1 ? CTxDestination(PKHash(confirm.rewardKeyID)) : CTxDestination(WitnessV0KeyHash(confirm.rewardKeyID));
 
         CDataStream metadata(DfAnchorFinalizeTxMarker, SER_NETWORK, PROTOCOL_VERSION);
-        auto nextTeam = penhancedview->CalcNextTeam(pindexPrev->stakeModifier);
+        auto nextTeam = pcustomcsview->CalcNextTeam(pindexPrev->stakeModifier);
         metadata
             << confirm.btcTxHash
             << confirm.anchorHeight
@@ -239,13 +241,13 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     // Pinch off foundation share
     CAmount foundationsReward = coinbaseTx.vout[0].nValue * chainparams.GetConsensus().foundationShare / 100;
     if (IsValidDestination(chainparams.GetConsensus().foundationAddress) && chainparams.GetConsensus().foundationShare != 0) {
-        if (penhancedview->GetFoundationsDebt() < foundationsReward) {
+        if (pcustomcsview->GetFoundationsDebt() < foundationsReward) {
             coinbaseTx.vout.resize(2);
             coinbaseTx.vout[1].scriptPubKey = GetScriptForDestination(chainparams.GetConsensus().foundationAddress);
-            coinbaseTx.vout[1].nValue = foundationsReward - penhancedview->GetFoundationsDebt();
+            coinbaseTx.vout[1].nValue = foundationsReward - pcustomcsview->GetFoundationsDebt();
             coinbaseTx.vout[0].nValue -= coinbaseTx.vout[1].nValue;
         } else {
-            penhancedview->SetFoundationsDebt(penhancedview->GetFoundationsDebt() - foundationsReward);
+            pcustomcsview->SetFoundationsDebt(pcustomcsview->GetFoundationsDebt() - foundationsReward);
         }
 
     }
@@ -582,7 +584,7 @@ namespace pos {
         uint32_t mintedBlocks(0);
         {
             LOCK(cs_main);
-            auto nodePtr = penhancedview->ExistMasternode(args.masternodeID);
+            auto nodePtr = pcustomcsview->ExistMasternode(args.masternodeID);
             if (!nodePtr || !nodePtr->IsActive(tip->height)) /// @todo miner: height+1 or nHeight+1 ???
             {
                 /// @todo may be new status for not activated (or already resigned) MN??

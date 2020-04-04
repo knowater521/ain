@@ -13,15 +13,56 @@ class CBlock;
 class CTransaction;
 class CTxMemPool;
 
-class CEnhancedCSView;
+class CCustomCSView;
 
-bool CheckMasternodeTx(CEnhancedCSView & mnview, CTransaction const & tx, const Consensus::Params& consensusParams, int height, int txn, bool isCheck = true);
+static const std::vector<unsigned char> DfTxMarker = {'D', 'f', 'T', 'x'};  // 44665478
+/// @todo refactor it to unify txs!!! (need to restart blockchain)
+static const std::vector<unsigned char> DfCriminalTxMarker = {'D', 'f', 'C', 'r'};
+static const std::vector<unsigned char> DfAnchorFinalizeTxMarker = {'D', 'f', 'A', 'f'};
 
-bool CheckInputsForCollateralSpent(CEnhancedCSView & mnview, CTransaction const & tx, int nHeight, bool isCheck);
+enum class CustomTxType : unsigned char
+{
+    None = 0,
+    CreateMasternode    = 'C',
+    ResignMasternode    = 'R',
+};
+
+inline CustomTxType CustomTxCodeToType(unsigned char ch) {
+    switch (ch) {
+        case 'C':
+        case 'R':
+            return static_cast<CustomTxType>(ch);
+        default:
+            return CustomTxType::None;
+    }
+}
+
+template<typename Stream>
+inline void Serialize(Stream& s, CustomTxType txType)
+{
+    Serialize(s, static_cast<unsigned char>(txType));
+}
+
+template<typename Stream>
+inline void Unserialize(Stream& s, CustomTxType & txType) {
+    unsigned char ch;
+    Unserialize(s, ch);
+
+    txType = CustomTxCodeToType(ch);
+}
+
+bool CheckMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, const Consensus::Params& consensusParams, int height, int txn, bool isCheck = true);
+
+bool CheckInputsForCollateralSpent(CCustomCSView & mnview, CTransaction const & tx, int nHeight, bool isCheck);
 //! Deep check (and write)
-bool CheckCreateMasternodeTx(CEnhancedCSView & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck);
-bool CheckResignMasternodeTx(CEnhancedCSView & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck);
+bool CheckCreateMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck);
+bool CheckResignMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck);
 
 bool IsMempooledMnCreate(const CTxMemPool& pool, const uint256 & txid);
+
+//! Checks if given tx is probably one of custom 'MasternodeTx', returns tx type and serialized metadata in 'data'
+CustomTxType GuessCustomTxType(CTransaction const & tx, std::vector<unsigned char> & metadata);
+bool IsCriminalProofTx(CTransaction const & tx, std::vector<unsigned char> & metadata);
+bool IsAnchorRewardTx(CTransaction const & tx, std::vector<unsigned char> & metadata);
 
 #endif // DEFI_MASTERNODES_MN_CHECKS_H

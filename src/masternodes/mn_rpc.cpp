@@ -3,6 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <masternodes/masternodes.h>
+#include <masternodes/criminals.h>
+#include <masternodes/mn_checks.h>
 
 #include <chainparams.h>
 #include <core_io.h>
@@ -199,20 +201,20 @@ UniValue createmasternode(const JSONRPCRequest& request)
     {
         auto locked_chain = pwallet->chain().lock();
 
-        if (penhancedview->ExistMasternodeByOwner(ownerAuthKey) ||
-            penhancedview->ExistMasternodeByOperator(ownerAuthKey))
+        if (pcustomcsview->ExistMasternodeByOwner(ownerAuthKey) ||
+            pcustomcsview->ExistMasternodeByOperator(ownerAuthKey))
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Masternode with collateralAddress == " + collateralAddress + " already exists");
         }
-        if (penhancedview->ExistMasternodeByOwner(operatorAuthKey) ||
-            penhancedview->ExistMasternodeByOperator(operatorAuthKey))
+        if (pcustomcsview->ExistMasternodeByOwner(operatorAuthKey) ||
+            pcustomcsview->ExistMasternodeByOperator(operatorAuthKey))
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Masternode with operatorAuthAddress == " + EncodeDestination(operatorDest) + " already exists");
         }
     }
 
     CDataStream metadata(DfTxMarker, SER_NETWORK, PROTOCOL_VERSION);
-    metadata << static_cast<unsigned char>(MasternodesTxType::CreateMasternode)
+    metadata << static_cast<unsigned char>(CustomTxType::CreateMasternode)
              << static_cast<char>(operatorDest.which()) << operatorAuthKey;
 
     CScript scriptMeta;
@@ -270,12 +272,12 @@ UniValue resignmasternode(const JSONRPCRequest& request)
     CTxDestination ownerDest;
     {
         auto locked_chain = pwallet->chain().lock();
-        auto optIDs = penhancedview->AmIOwner();
+        auto optIDs = pcustomcsview->AmIOwner();
         if (!optIDs)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("You are not the owner of masternode %s, or it does not exist", nodeIdStr));
         }
-        auto nodePtr = penhancedview->ExistMasternode(nodeId);
+        auto nodePtr = pcustomcsview->ExistMasternode(nodeId);
         if (nodePtr->banHeight != -1)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Masternode %s was criminal, banned at height %i by tx %s", nodeIdStr, nodePtr->banHeight, nodePtr->banTx.GetHex()));
@@ -315,7 +317,7 @@ UniValue resignmasternode(const JSONRPCRequest& request)
     }
 
     CDataStream metadata(DfTxMarker, SER_NETWORK, PROTOCOL_VERSION);
-    metadata << static_cast<unsigned char>(MasternodesTxType::ResignMasternode)
+    metadata << static_cast<unsigned char>(CustomTxType::ResignMasternode)
              << nodeId;
 
     CScript scriptMeta;
@@ -396,7 +398,7 @@ UniValue listmasternodes(const JSONRPCRequest& request)
     if (inputs.empty())
     {
         // Dumps all!
-        penhancedview->ForEachMasternode([&ret, verbose] (uint256 const & nodeId, CMasternode & node) {
+        pcustomcsview->ForEachMasternode([&ret, verbose] (uint256 const & nodeId, CMasternode & node) {
             ret.pushKV(nodeId.GetHex(), verbose ? mnToJSON(node) : CMasternode::GetHumanReadableState(node.GetState()));
             return true;
         });
@@ -406,7 +408,7 @@ UniValue listmasternodes(const JSONRPCRequest& request)
         for (size_t idx = 0; idx < inputs.size(); ++idx)
         {
             uint256 id = ParseHashV(inputs[idx], "masternode id");
-            auto const node = penhancedview->ExistMasternode(id);
+            auto const node = pcustomcsview->ExistMasternode(id);
             if (node) {
                 ret.pushKV(id.GetHex(), verbose ? mnToJSON(*node) : CMasternode::GetHumanReadableState(node->GetState()));
             }
