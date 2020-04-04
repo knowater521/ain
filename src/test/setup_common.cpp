@@ -12,7 +12,7 @@
 #include <crypto/sha256.h>
 #include <init.h>
 #include <masternodes/anchors.h>
-#include <masternodes/mn_txdb.h>
+#include <masternodes/criminals.h>
 #include <miner.h>
 #include <net.h>
 #include <noui.h>
@@ -115,9 +115,9 @@ TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(cha
         pcriminals.reset();
         pcriminals = MakeUnique<CCriminalsView>(GetDataDir() / "criminals", nMinDbCache << 20, true, true);
 
-        penhancedDB.reset();
-        penhancedDB = MakeUnique<CStorageLevelDB>(GetDataDir() / "enhancedcs", nMinDbCache << 20, true, true);
-        penhancedview = MakeUnique<CEnhancedCSView>(*penhancedDB.get());
+        pcustomcsDB.reset();
+        pcustomcsDB = MakeUnique<CStorageLevelDB>(GetDataDir() / "enhancedcs", nMinDbCache << 20, true, true);
+        pcustomcsview = MakeUnique<CCustomCSView>(*pcustomcsDB.get());
 
         panchorauths.reset();
         panchorauths = MakeUnique<CAnchorAuthIndex>();
@@ -159,8 +159,8 @@ TestingSetup::~TestingSetup()
     panchors.reset();
     panchorAwaitingConfirms.reset();
     panchorauths.reset();
-    penhancedview.reset();
-    penhancedDB.reset();
+    pcustomcsview.reset();
+    pcustomcsDB.reset();
     pcriminals.reset();
 
     pblocktree.reset();
@@ -210,7 +210,7 @@ TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransaction>&
         LOCK(cs_main);
         tip = ::ChainActive().Tip();
 
-        auto nodePtr = penhancedview->ExistMasternode(masternodeID);
+        auto nodePtr = pcustomcsview->ExistMasternode(masternodeID);
         if (!nodePtr || !nodePtr->IsActive(tip->height))
             throw std::runtime_error(std::string(__func__) + ": nodePtr does not exist");
 

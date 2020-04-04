@@ -671,7 +671,7 @@ UniValue spv_listanchorrewards(const JSONRPCRequest& request)
 
     UniValue result(UniValue::VARR);
 
-    penhancedview->ForEachAnchorReward([&result] (uint256 const & btcHash, uint256 & rewardHash) {
+    pcustomcsview->ForEachAnchorReward([&result] (uint256 const & btcHash, uint256 & rewardHash) {
         UniValue item(UniValue::VOBJ);
         item.pushKV("AnchorTxHash", btcHash.ToString());
         item.pushKV("RewardTxHash", rewardHash.ToString());

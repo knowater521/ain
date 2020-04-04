@@ -1939,7 +1939,7 @@ void static ProcessOrphanTx(CConnman* connman, std::set<uint256>& orphan_work_se
             EraseOrphanTx(orphanHash);
             done = true;
         }
-        mempool.xcheck(&::ChainstateActive().CoinsTip(), penhancedview.get());
+        mempool.xcheck(&::ChainstateActive().CoinsTip(), pcustomcsview.get());
     }
 }
 
@@ -2714,7 +2714,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
         if (!AlreadyHave(inv) &&
             AcceptToMemoryPool(mempool, state, ptx, &fMissingInputs, &lRemovedTxn, false /* bypass_limits */, 0 /* nAbsurdFee */)) {
-            mempool.xcheck(&::ChainstateActive().CoinsTip(), penhancedview.get());
+            mempool.xcheck(&::ChainstateActive().CoinsTip(), pcustomcsview.get());
             RelayTransaction(tx.GetHash(), *connman);
             for (unsigned int i = 0; i < tx.vout.size(); i++) {
                 auto it_by_prev = mapOrphanTransactionsByPrev.find(COutPoint(inv.hash, i));

@@ -19,7 +19,7 @@ class CCoinsViewCache;
 
 class CKeyID;
 
-class CEnhancedCSView;
+class CCustomCSView;
 
 namespace pos {
 

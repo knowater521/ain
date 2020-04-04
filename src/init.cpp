@@ -26,7 +26,7 @@
 #include <key.h>
 #include <key_io.h>
 #include <masternodes/anchors.h>
-#include <masternodes/mn_txdb.h>
+#include <masternodes/criminals.h>
 #include <miner.h>
 #include <net.h>
 #include <net_permissions.h>
@@ -275,8 +275,8 @@ void Shutdown(InitInterfaces& interfaces)
         panchors.reset();
         panchorAwaitingConfirms.reset();
         panchorauths.reset();
-        penhancedview.reset();
-        penhancedDB.reset();
+        pcustomcsview.reset();
+        pcustomcsDB.reset();
         pcriminals.reset();
         pblocktree.reset();
     }
@@ -1572,10 +1572,10 @@ bool AppInitMain(InitInterfaces& interfaces)
                 pcriminals.reset();
                 pcriminals = MakeUnique<CCriminalsView>(GetDataDir() / "criminals", nMinDbCache << 20, false, fReset || fReindexChainState);
 
-                penhancedDB.reset();
-                penhancedDB = MakeUnique<CStorageLevelDB>(GetDataDir() / "enhancedcs", nMinDbCache << 20, false, fReset || fReindexChainState);
-                penhancedview.reset();
-                penhancedview = MakeUnique<CEnhancedCSView>(*penhancedDB.get());
+                pcustomcsDB.reset();
+                pcustomcsDB = MakeUnique<CStorageLevelDB>(GetDataDir() / "enhancedcs", nMinDbCache << 20, false, fReset || fReindexChainState);
+                pcustomcsview.reset();
+                pcustomcsview = MakeUnique<CCustomCSView>(*pcustomcsDB.get());
 
                 panchorauths.reset();
                 panchorauths = MakeUnique<CAnchorAuthIndex>();
@@ -1604,7 +1604,7 @@ bool AppInitMain(InitInterfaces& interfaces)
                 }
 
                 // ReplayBlocks is a no-op if we cleared the coinsviewdb with -reindex or -reindex-chainstate
-                if (!ReplayBlocks(chainparams, &::ChainstateActive().CoinsDB(), penhancedview.get())) {
+                if (!ReplayBlocks(chainparams, &::ChainstateActive().CoinsDB(), pcustomcsview.get())) {
                     strLoadError = _("Unable to replay blocks. You will need to rebuild the database using -reindex-chainstate.").translated;
                     break;
                 }
@@ -1892,7 +1892,7 @@ bool AppInitMain(InitInterfaces& interfaces)
     if(gArgs.GetBoolArg("-gen", DEFAULT_GENERATE)) {
         LOCK(cs_main);
 
-        auto myIDs = penhancedview->AmIOperator();
+        auto myIDs = pcustomcsview->AmIOperator();
         if (myIDs)
         {
             pos::ThreadStaker::Args stakerParams{};
@@ -1917,7 +1917,7 @@ bool AppInitMain(InitInterfaces& interfaces)
                     return false;
                 }
 
-                CMasternode const node = *penhancedview->ExistMasternode(myIDs->second);
+                CMasternode const node = *pcustomcsview->ExistMasternode(myIDs->second);
                 CTxDestination destination = node.operatorType == 1 ? CTxDestination(PKHash(node.operatorAuthAddress)) : CTxDestination(WitnessV0KeyHash(node.operatorAuthAddress));
 
                 CScript coinbaseScript = GetScriptForDestination(destination);

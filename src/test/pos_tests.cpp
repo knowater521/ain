@@ -144,17 +144,17 @@ BOOST_AUTO_TEST_CASE(contextual_check_pos)
     BOOST_CHECK(pos != testMasternodeKeys.end());
     CKey minterKey = pos->second.operatorKey;
 
-    BOOST_CHECK(pos::ContextualCheckProofOfStake((CBlockHeader)Params().GenesisBlock(), Params().GetConsensus(), penhancedview.get()));
+    BOOST_CHECK(pos::ContextualCheckProofOfStake((CBlockHeader)Params().GenesisBlock(), Params().GetConsensus(), pcustomcsview.get()));
 
     uint256 prev_hash = uint256S("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
     uint64_t height = 0;
     uint64_t mintedBlocks = 1;
     std::shared_ptr<CBlock> block = Block(Params().GenesisBlock().GetHash(), height, mintedBlocks);
 
-    BOOST_CHECK(!pos::ContextualCheckProofOfStake(*(CBlockHeader*)block.get(), Params().GetConsensus(), penhancedview.get()));
+    BOOST_CHECK(!pos::ContextualCheckProofOfStake(*(CBlockHeader*)block.get(), Params().GetConsensus(), pcustomcsview.get()));
 
     block->height = 1;
-    BOOST_CHECK(!pos::ContextualCheckProofOfStake(*(CBlockHeader*)block.get(), Params().GetConsensus(), penhancedview.get()));
+    BOOST_CHECK(!pos::ContextualCheckProofOfStake(*(CBlockHeader*)block.get(), Params().GetConsensus(), pcustomcsview.get()));
 
 //    std::shared_ptr<CBlock> finalizeBlock = FinalizeBlock(
 //        block,
@@ -197,7 +197,7 @@ BOOST_AUTO_TEST_CASE(sign_pos_block)
     BOOST_CHECK(!pos::SignPosBlock(block, minterKey));
     BOOST_CHECK_THROW(pos::SignPosBlock(block, minterKey), std::logic_error);
 
-    BOOST_CHECK(!pos::CheckProofOfStake(*(CBlockHeader*)block.get(), ::ChainActive().Tip(), Params().GetConsensus(), penhancedview.get()));
+    BOOST_CHECK(!pos::CheckProofOfStake(*(CBlockHeader*)block.get(), ::ChainActive().Tip(), Params().GetConsensus(), pcustomcsview.get()));
 
     uint256 prevStakeModifier = Params().GenesisBlock().stakeModifier;
 //    std::shared_ptr<CBlock> correctBlock = FinalizeBlock(
