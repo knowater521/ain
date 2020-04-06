@@ -19,7 +19,8 @@
 #include <algorithm>
 #include <functional>
 
-// Prefixes to the masternodes database (masternodes/)
+/// @attention make sure that it does not overlap with those in tokens.cpp !!!
+// Prefixes for the 'custom chainstate database' (customsc/)
 const unsigned char DB_MASTERNODES = 'M';     // main masternodes table
 const unsigned char DB_MN_OPERATORS = 'o';    // masternodes' operators index
 const unsigned char DB_MN_OWNERS = 'w';       // masternodes' owners index

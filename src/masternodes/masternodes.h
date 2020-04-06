@@ -9,6 +9,7 @@
 #include <flushablestorage.h>
 #include <pubkey.h>
 #include <serialize.h>
+#include <masternodes/tokens.h>
 #include <uint256.h>
 
 #include <functional>
@@ -180,6 +181,7 @@ class CCustomCSView
         , public CTeamView
         , public CFoundationsDebtView
         , public CAnchorRewardsView
+        , public CTokensView
 {
 public:
     CCustomCSView(CStorageKV & st)
