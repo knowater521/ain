@@ -155,9 +155,10 @@ DEFI_CORE_H = \
   limitedmap.h \
   logging.h \
   masternodes/anchors.h \
+  masternodes/criminals.h \
   masternodes/masternodes.h \
   masternodes/mn_checks.h \
-  masternodes/criminals.h \
+  masternodes/tokens.h \
   memusage.h \
   merkleblock.h \
   miner.h \
@@ -291,10 +292,11 @@ libdefi_server_a_SOURCES = \
   init.cpp \
   dbwrapper.cpp \
   masternodes/anchors.cpp \
+  masternodes/criminals.cpp \
   masternodes/masternodes.cpp \
   masternodes/mn_checks.cpp \
-  masternodes/criminals.cpp \
   masternodes/mn_rpc.cpp \
+  masternodes/tokens.cpp \
   miner.cpp \
   net.cpp \
   net_processing.cpp \
