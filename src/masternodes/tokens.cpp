@@ -152,7 +152,7 @@ bool CTokensView::RevertCreateToken(const uint256 & txid)
     DCT_ID id = pair->first;
     auto lastId = ReadLastDctId();
     if (!lastId || (*lastId) != id) {
-        LogPrintf("Token creation revert error: revert sequence broken! (id = %d, LastDctId = %d)\n", txid.ToString(), id, (lastId ? *lastId : 0));
+        LogPrintf("Token creation revert error: revert sequence broken! (txid = %s, id = %d, LastDctId = %d)\n", txid.ToString(), id, (lastId ? *lastId : 0));
         return false;
     }
     auto const & token = pair->second;
