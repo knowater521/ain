@@ -293,23 +293,12 @@ public:
     bool Write(const KeyType& key, const ValueType& value) {
         auto vKey = DbTypeToBytes(key);
         auto vValue = DbTypeToBytes(value);
-//        if (DB().Exists(vKey))
-//            return false;
         return DB().Write(vKey, vValue);
     }
     template<typename By, typename KeyType, typename ValueType>
     bool WriteBy(const KeyType& key, const ValueType& value) {
         return Write(std::make_pair(By::prefix, key), value);
     }
-
-//    template<typename KeyType, typename ValueType>
-//    bool Update(const KeyType& key, const ValueType& value) {
-//        auto vKey = DbTypeToBytes(key);
-//        auto vValue = DbTypeToBytes(value);
-//        if (!DB().Exists(vKey))
-//            return false;
-//        return DB().Write(vKey, vValue);
-//    }
 
     template<typename KeyType>
     bool Erase(const KeyType& key) {
@@ -365,24 +354,6 @@ public:
         }
         return true;
     }
-
-//    template<typename T>
-//    static TBytes DbTypeToBytes(const T& value) {
-//        CDataStream stream(SER_DISK, CLIENT_VERSION);
-//        stream << value;
-//        return TBytes(stream.begin(), stream.end());
-//    }
-
-//    template<typename T>
-//    static void BytesToDbType(const TBytes& bytes, T& value) {
-//        try {
-//            CDataStream stream(bytes, SER_DISK, CLIENT_VERSION);
-//            stream >> value;
-//            assert(stream.size() == 0);
-//        }
-//        catch (std::ios_base::failure&) {
-//        }
-//    }
 
 protected:
     CStorageKV & DB() { return *storage.get(); }
