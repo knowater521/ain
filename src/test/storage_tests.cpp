@@ -10,7 +10,7 @@ int GetTokensCount()
 {
     int counter{0};
     pcustomcsview->ForEachToken([&counter] (DCT_ID const & id, CToken const & token) {
-        printf("DCT_ID: %d, Token: %s: %s\n", id, token.symbol.c_str(), token.name.c_str());
+//        printf("DCT_ID: %d, Token: %s: %s\n", id, token.symbol.c_str(), token.name.c_str()); // dump for debug
         ++counter;
         return true;
     });

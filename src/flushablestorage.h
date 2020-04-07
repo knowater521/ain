@@ -2,8 +2,8 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef FLUSHABLE_STORAGE_H
-#define FLUSHABLE_STORAGE_H
+#ifndef DEFI_FLUSHABLESTORAGE_H
+#define DEFI_FLUSHABLESTORAGE_H
 
 #include <dbwrapper.h>
 #include <boost/optional.hpp>
@@ -362,4 +362,4 @@ private:
     std::unique_ptr<CStorageKV> storage;
 };
 
-#endif
+#endif // DEFI_FLUSHABLESTORAGE_H
