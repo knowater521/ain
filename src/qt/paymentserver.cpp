@@ -609,7 +609,7 @@ bool PaymentServer::processPaymentRequest(const PaymentRequestPlus& request, Sen
 
         // Extract and check amounts
         CTxOut txOut(sendingTo.second, sendingTo.first);
-        if (IsDust(txOut, optionsModel->node().getDustRelayFee())) {
+        if (IsDust(txOut, 1, optionsModel->node().getDustRelayFee())) {  /// @todo tokens: subst "1" with correct txout version when implemented
             Q_EMIT message(tr("Payment request error"), tr("Requested payment amount of %1 is too small (considered dust).")
                 .arg(DefiUnits::formatWithUnit(optionsModel->getDisplayUnit(), sendingTo.second)),
                 CClientUIInterface::MSG_ERROR);

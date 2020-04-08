@@ -421,7 +421,7 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
             // Assumes a p2pkh script size
             CTxOut txout(amount, CScript() << std::vector<unsigned char>(24, 0));
             txDummy.vout.push_back(txout);
-            fDust |= IsDust(txout, model->node().getDustRelayFee());
+            fDust |= IsDust(txout, 1, model->node().getDustRelayFee()); /// @todo tokens: subst "1" with correct txout version when implemented
         }
     }
 
@@ -512,7 +512,7 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
             {
                 // Assumes a p2pkh script size
                 CTxOut txout(nChange, CScript() << std::vector<unsigned char>(24, 0));
-                if (IsDust(txout, model->node().getDustRelayFee()))
+                if (IsDust(txout, 1, model->node().getDustRelayFee())) /// @todo tokens: subst "1" with correct txout version when implemented
                 {
                     nPayFee += nChange;
                     nChange = 0;
