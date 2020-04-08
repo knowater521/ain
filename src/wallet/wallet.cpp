@@ -3021,7 +3021,7 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
                 scriptChange = GetScriptForDestination(dest);
             }
             CTxOut change_prototype_txout(0, scriptChange);
-            coin_selection_params.change_output_size = GetSerializeSize(change_prototype_txout);
+            coin_selection_params.change_output_size = GetSerializeSize(change_prototype_txout, txNew.nVersion < CTransaction::TOKENS_MIN_VERSION ? SERIALIZE_TRANSACTION_NO_TOKENS : 0);
 
             CFeeRate discard_rate = GetDiscardRate(*this);
 
@@ -3065,9 +3065,10 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
                         }
                     }
                     // Include the fee cost for outputs. Note this is only used for BnB right now
-                    coin_selection_params.tx_noinputs_size += ::GetSerializeSize(txout, PROTOCOL_VERSION);
+                    coin_selection_params.tx_noinputs_size += ::GetSerializeSize(txout, PROTOCOL_VERSION
+                                                                                 | (txNew.nVersion < CTransaction::TOKENS_MIN_VERSION ? SERIALIZE_TRANSACTION_NO_TOKENS : 0));
 
-                    if (IsDust(txout, chain().relayDustFee()))
+                    if (IsDust(txout, txNew.nVersion, chain().relayDustFee()))
                     {
                         if (recipient.fSubtractFeeFromAmount && nFeeRet > 0)
                         {
@@ -3122,7 +3123,7 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
                     // Never create dust outputs; if we would, just
                     // add the dust to the fee.
                     // The nChange when BnB is used is always going to go to fees.
-                    if (IsDust(newTxOut, discard_rate) || bnb_used)
+                    if (IsDust(newTxOut, txNew.nVersion, discard_rate) || bnb_used)
                     {
                         nChangePosInOut = -1;
                         nFeeRet += nChange;
@@ -3180,7 +3181,7 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
                     if (nChangePosInOut == -1 && nSubtractFeeFromAmount == 0 && pick_new_inputs) {
                         unsigned int tx_size_with_change = nBytes + coin_selection_params.change_output_size + 2; // Add 2 as a buffer in case increasing # of outputs changes compact size
                         CAmount fee_needed_with_change = GetMinimumFee(*this, tx_size_with_change, coin_control, nullptr);
-                        CAmount minimum_value_for_change = GetDustThreshold(change_prototype_txout, discard_rate);
+                        CAmount minimum_value_for_change = GetDustThreshold(change_prototype_txout, txNew.nVersion, discard_rate);
                         if (nFeeRet >= fee_needed_with_change + minimum_value_for_change) {
                             pick_new_inputs = false;
                             nFeeRet = fee_needed_with_change;

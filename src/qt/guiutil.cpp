@@ -208,7 +208,7 @@ bool isDust(interfaces::Node& node, const QString& address, const CAmount& amoun
     CTxDestination dest = DecodeDestination(address.toStdString());
     CScript script = GetScriptForDestination(dest);
     CTxOut txOut(amount, script);
-    return IsDust(txOut, node.getDustRelayFee());
+    return IsDust(txOut, 1, node.getDustRelayFee());  /// @todo tokens: subst "1" with correct txout version when implemented
 }
 
 QString HtmlEscape(const QString& str, bool fMultiLine)
