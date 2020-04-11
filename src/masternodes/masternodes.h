@@ -30,6 +30,8 @@ int GetMnResignDelay();
 int GetMnHistoryFrame();
 CAmount GetMnCollateralAmount();
 CAmount GetMnCreationFee(int height);
+CAmount GetTokenCollateralAmount();
+CAmount GetTokenCreationFee(int height);
 
 class CMasternode
 {
@@ -116,8 +118,6 @@ public:
     boost::optional<uint256> ExistMasternodeByOwner(CKeyID const & id) const;
     void ForEachMasternode(std::function<bool(uint256 const & id, CMasternode & node)> callback);
 
-    bool CanSpend(const uint256 & nodeId, int height) const;
-
     void IncrementMintedBy(CKeyID const & minter);
     void DecrementMintedBy(CKeyID const & minter);
 
@@ -200,6 +200,8 @@ public:
 
     // simplified version of undo, without any unnecessary undo data
     void OnUndoTx(CTransaction const & tx);
+
+    bool CanSpend(const uint256 & txId, int height) const;
 
     bool Flush() { return DB().Flush(); }
 };

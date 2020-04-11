@@ -49,14 +49,9 @@ bool HasAuth(CTransaction const & tx, CKeyID const & auth)
             if (GetPubkeyFromScriptSig(input.scriptSig).GetID() == auth)
                return true;
         }
-        else
-        {
+        else {
             /// @todo EXTEND IT TO SUPPORT WITNESS!!
             auto test = CPubKey(input.scriptWitness.stack.back());
-//            auto addr = test.GetID();
-//            (void) addr;
-//            std::cout << addr.ToString();
-
             if (test.GetID() == auth)
                return true;
         }
@@ -64,7 +59,19 @@ bool HasAuth(CTransaction const & tx, CKeyID const & auth)
     return false;
 }
 
-bool CheckMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, Consensus::Params const & consensusParams, int height, int txn, bool isCheck)
+bool HasAuth(CTransaction const & tx, const CCoinsViewCache &coins, uint256 const & tokenTx)
+{
+    const Coin& auth = coins.AccessCoin(COutPoint(tokenTx, 1));
+    for (auto input : tx.vin) {
+        const Coin& coin = coins.AccessCoin(input.prevout);
+        assert(!coin.IsSpent());
+        if (coin.out.scriptPubKey == auth.out.scriptPubKey)
+            return true;
+    }
+    return false;
+}
+
+bool CheckCustomTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, Consensus::Params const & consensusParams, int height, int txn, bool isCheck)
 {
     bool result = true;
 
@@ -80,6 +87,12 @@ bool CheckMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, Consensu
             break;
             case CustomTxType::ResignMasternode:
                 result = result && CheckResignMasternodeTx(mnview, tx, height, txn, metadata, isCheck);
+            break;
+            case CustomTxType::CreateToken:
+                result = result && CheckCreateTokenTx(mnview, tx, height, txn, metadata, isCheck);
+            break;
+            case CustomTxType::DestroyToken:
+                result = result && CheckDestroyTokenTx(mnview, coins, tx, height, txn, metadata, isCheck);
             break;
             default:
                 break;
@@ -97,20 +110,14 @@ bool CheckCreateMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, in
 {
     // Check quick conditions first
     if (tx.vout.size() < 2 ||
-        tx.vout[0].nValue < GetMnCreationFee(height) ||
-        tx.vout[1].nValue != GetMnCollateralAmount()
-        )
-    {
+        tx.vout[0].nValue < GetMnCreationFee(height) || tx.vout[0].nTokenId != 0 ||
+        tx.vout[1].nValue != GetMnCollateralAmount() || tx.vout[1].nTokenId != 0
+        ) {
         return false;
     }
     CMasternode node(tx, height, metadata);
-    if (node.ownerAuthAddress.IsNull() || node.operatorAuthAddress.IsNull())
-    {
-        return false;
-    }
     bool result = mnview.CreateMasternode(tx.GetHash(), node, txn);
-    if (!isCheck)
-    {
+    if (!isCheck) {
         LogPrintf("MN %s: Creation by tx %s at block %d\n", result ? "APPLYED" : "SKIPPED", tx.GetHash().GetHex(), height);
     }
     return result;
@@ -118,56 +125,63 @@ bool CheckCreateMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, in
 
 bool CheckResignMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, int height, int txn, const std::vector<unsigned char> & metadata, bool isCheck)
 {
-    uint256 nodeId(metadata);
+    uint256 const nodeId(metadata);
     auto const node = mnview.ExistMasternode(nodeId);
     if (!node || !HasAuth(tx, node->ownerAuthAddress))
         return false;
 
-    auto state = node->GetState(height);
-    if ((state != CMasternode::PRE_ENABLED && state != CMasternode::ENABLED) /*|| mnview.IsAnchorInvolved(nodeId, height) */) /// @todo newbase
-    {
-        /// @todo more verbose? at least, auth?
-        return false;
-    }
-
     bool result = mnview.ResignMasternode(nodeId, tx.GetHash(), height, txn);
-    if (!isCheck)
-    {
+    if (!isCheck) {
         LogPrintf("MN %s: Resign by tx %s at block %d\n", result ? "APPLYED" : "SKIPPED", tx.GetHash().GetHex(), height);
     }
     return result;
 }
 
-/*
- * Checks all inputs for collateral.
- */
-bool CheckInputsForCollateralSpent(CCustomCSView & mnview, CTransaction const & tx, int height, bool isCheck)
+bool CheckCreateTokenTx(CCustomCSView & mnview, CTransaction const & tx, int height, int, std::vector<unsigned char> const & metadata, bool isCheck)
 {
-    bool total(true);
-    for (uint32_t i = 0; i < tx.vin.size() && total; ++i)
-    {
-        COutPoint const & prevout = tx.vin[i].prevout;
-        // Checks if it was collateral output.
-        if (prevout.n == 1 && mnview.ExistMasternode(prevout.hash))
-        {
-            // i - unused
-            bool result = mnview.CanSpend(prevout.hash, height);
-
-            if (!isCheck)
-            {
-                LogPrintf("MN %s: Spent collateral by tx %s for %s at block %d\n", result ? "APPROVED" : "DENIED", tx.GetHash().GetHex(), prevout.hash.GetHex(), height);
-            }
-            total = total && result;
-        }
+    // Check quick conditions first
+    if (tx.vout.size() < 2 ||
+        tx.vout[0].nValue < GetTokenCreationFee(height) || tx.vout[0].nTokenId != 0 ||
+        tx.vout[1].nValue != GetTokenCollateralAmount() || tx.vout[1].nTokenId != 0
+        ) {
+        return false;
     }
-    return total;
+    CTokenImplementation token(tx, height, metadata);
+    bool result = mnview.CreateToken(token);
+    if (!isCheck) {
+        LogPrintf("Token %s: Creation '%s' by tx %s at block %d\n", result ? "APPLYED" : "SKIPPED", token.symbol, tx.GetHash().GetHex(), height);
+    }
+    return result;
 }
 
-bool IsMempooledMnCreate(const CTxMemPool & pool, const uint256 & txid)
+bool CheckDestroyTokenTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, int height, int, std::vector<unsigned char> const & metadata, bool isCheck)
+{
+    uint256 const tokenTx(metadata);
+    auto pair = mnview.ExistTokenByCreationTx(tokenTx);
+    if (!pair) {
+        return false;
+    }
+    CTokenImplementation const & token = pair->second;
+    if (!HasAuth(tx, coins, token.creationTx)) {
+        return false;
+    }
+
+    bool result = mnview.DestroyToken(token.creationTx, tx.GetHash(), height);
+    if (!isCheck) {
+        LogPrintf("Token %s: Destruction '%s' by tx %s at block %d\n", result ? "APPLYED" : "SKIPPED", token.symbol, tx.GetHash().GetHex(), height);
+    }
+    return result;
+}
+
+bool IsMempooledCustomTxCreate(const CTxMemPool & pool, const uint256 & txid)
 {
     CTransactionRef ptx = pool.get(txid);
     std::vector<unsigned char> dummy;
-    return (ptx && GuessCustomTxType(*ptx, dummy) == CustomTxType::CreateMasternode);
+    if (ptx) {
+        CustomTxType txType = GuessCustomTxType(*ptx, dummy);
+        return txType == CustomTxType::CreateMasternode || txType == CustomTxType::CreateToken;
+    }
+    return false;
 }
 
 bool IsCriminalProofTx(CTransaction const & tx, std::vector<unsigned char> & metadata)
@@ -218,7 +232,7 @@ bool IsAnchorRewardTx(CTransaction const & tx, std::vector<unsigned char> & meta
 
 
 /*
- * Checks if given tx is probably one of 'MasternodeTx', returns tx type and serialized metadata in 'data'
+ * Checks if given tx is probably one of 'CustomTx', returns tx type and serialized metadata in 'data'
 */
 CustomTxType GuessCustomTxType(CTransaction const & tx, std::vector<unsigned char> & metadata)
 {

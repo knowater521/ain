@@ -109,6 +109,12 @@ struct Params {
     };
     MnParams mn;
 
+    struct TokenParams {
+        CAmount creationFee;
+        CAmount collateralAmount;
+    };
+    TokenParams token;
+
     struct SpvParams {
         CAmount creationFee;
         CAmount anchorSubsidy;
