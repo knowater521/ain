@@ -175,6 +175,11 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "resignmasternode", 1, "mn_id" },
     { "listmasternodes", 0, "list" },
     { "listmasternodes", 1, "verbose" },
+    { "createtoken", 0, "inputs" },
+    { "createtoken", 1, "metadata" },
+    { "destroytoken", 0, "inputs" },
+    { "destroytoken", 1, "symbol" },
+    { "listtokens", 0, "verbose" },
 
     { "spv_sendrawtx", 0, "rawtx" },
     { "spv_createanchor", 0, "inputs" },
