@@ -559,10 +559,10 @@ static bool AcceptToMemoryPoolWorker(const CChainParams& chainparams, CTxMemPool
                 return false; // fMissingInputs and !state.IsInvalid() is used to detect this condition, don't set state.Invalid()
             }
 
-            // Special check of collateral spending for _not_created_mn_ (cheating?), those creation tx yet in mempool. CMasternode::CanSpend() (and CheckTxInputs()) will skip this situation
-            if (txin.prevout.n == 1 && IsMempooledMnCreate(pool, txin.prevout.hash)) {
-                    return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "mn-collateral-locked-in-mempool",
-                                         strprintf("tried to spend collateral of non-created mn %s, cheater?", txin.prevout.hash.ToString()));
+            // Special check of collateral spending for _not_created_ mn or token (cheating?), those creation tx yet in mempool. CMasternode::CanSpend() (and CheckTxInputs()) will skip this situation
+            if (txin.prevout.n == 1 && IsMempooledCustomTxCreate(pool, txin.prevout.hash)) {
+                    return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "collateral-locked-in-mempool",
+                                         strprintf("tried to spend collateral of non-created mn or token %s, cheater?", txin.prevout.hash.ToString()));
             }
         }
 
@@ -1851,7 +1851,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
             view.SetBestBlock(pindex->GetBlockHash());
             // init view|db with genesis here
             for (size_t i = 1; i < block.vtx.size(); ++i) {
-                CheckMasternodeTx(mnview, *block.vtx[i], chainparams.GetConsensus(), pindex->nHeight, i, fJustCheck);
+                CheckCustomTx(mnview, view, *block.vtx[i], chainparams.GetConsensus(), pindex->nHeight, i, fJustCheck);
             }
         }
         return true;
@@ -2093,7 +2093,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
             }
 
             // we will never fail, but skip
-            CheckMasternodeTx(mnview, tx, chainparams.GetConsensus(), pindex->nHeight, i, fJustCheck);
+            CheckCustomTx(mnview, view, tx, chainparams.GetConsensus(), pindex->nHeight, i, fJustCheck);
 
             control.Add(vChecks);
         } else {
@@ -4625,7 +4625,7 @@ bool CChainState::RollforwardBlock(const CBlockIndex* pindex, CCoinsViewCache& i
         AddCoins(inputs, *tx, pindex->nHeight, true);
 
         /// @todo turn it on when you are sure it is safe
-//        CheckMasternodeTx(mnview, *tx, params.GetConsensus(), pindex->nHeight, i, false);
+//        CheckCustomTx(mnview, inputs, *tx, params.GetConsensus(), pindex->nHeight, i, false);
     }
     return true;
 }

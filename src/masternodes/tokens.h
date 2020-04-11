@@ -12,8 +12,7 @@
 #include <serialize.h>
 #include <uint256.h>
 
-class CKey;
-class CPubkey;
+class CTransaction;
 
 using DCT_ID = uint32_t;    // VARINT ?
 
@@ -44,6 +43,7 @@ public:
         , limit(0)
         , flags(uint8_t(TokenFlags::Default))
     {}
+    virtual ~CToken() = default;
 
     bool IsMintable() const
     {
@@ -70,18 +70,29 @@ class CTokenImplementation : public CToken
 {
 public:
     //! tx related properties
-    CScript owner;
     uint256 creationTx;
     uint256 destructionTx;
     int32_t creationHeight;
     int32_t destructionHeight;
+
+    CTokenImplementation()
+        : CToken()
+        , creationTx()
+        , destructionTx()
+        , creationHeight(-1)
+        , destructionHeight(-1)
+    {}
+    CTokenImplementation(CTransaction const & tx, int heightIn, std::vector<unsigned char> const & metadata);
+    ~CTokenImplementation() override = default;
+
+    //! constructor helper, runs without any checks
+    void FromTx(CTransaction const & tx, int heightIn, std::vector<unsigned char> const & metadata);
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITEAS(CToken, *this);
-        READWRITE(owner);
         READWRITE(creationTx);
         READWRITE(destructionTx);
         READWRITE(creationHeight);
@@ -124,8 +135,8 @@ public:
 
     bool CreateToken(CTokenImpl const & token);
     bool RevertCreateToken(uint256 const & txid);
-    bool DestroyToken(DCT_ID id, uint256 const & txid, int height);
-    bool RevertDestroyToken(DCT_ID id, uint256 const & txid);
+    bool DestroyToken(uint256 const & tokenTx, uint256 const & txid, int height);
+    bool RevertDestroyToken(uint256 const & tokenTx, uint256 const & txid);
 
     // tags
     struct ID { static const unsigned char prefix; };

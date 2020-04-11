@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <masternodes/tokens.h>
+#include <primitives/transaction.h>
 
 /// @attention make sure that it does not overlap with those in masternodes.cpp !!!
 const unsigned char CTokensView::ID          ::prefix = 'T';
@@ -13,6 +14,22 @@ const unsigned char CTokensView::LastDctId   ::prefix = 'L';
 const DCT_ID CTokensView::DCT_ID_START = 128;
 
 extern const std::string CURRENCY_UNIT;
+
+CTokenImplementation::CTokenImplementation(const CTransaction & tx, int heightIn, const std::vector<unsigned char> & metadata)
+{
+    FromTx(tx, heightIn, metadata);
+}
+
+void CTokenImplementation::FromTx(CTransaction const & tx, int heightIn, std::vector<unsigned char> const & metadata)
+{
+    CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
+    ss >> static_cast<CToken &>(*this);
+
+    creationTx = tx.GetHash();
+    creationHeight = heightIn;
+    destructionTx = {};
+    destructionHeight = -1;
+}
 
 void CStableTokens::Initialize(CStableTokens & dst)
 {
@@ -118,7 +135,6 @@ void CTokensView::ForEachToken(std::function<bool (const DCT_ID &, const CToken 
     auto hint = WrapVarInt(tokenId);
 
     ForEach<ID, CVarInt<VarIntMode::DEFAULT, DCT_ID>, CTokenImpl>([&tokenId, &callback] (CVarInt<VarIntMode::DEFAULT, DCT_ID> const &, CTokenImpl tokenImpl) {
-        // is id catched here?
         return callback(tokenId, tokenImpl);
     }, hint);
 
@@ -163,53 +179,43 @@ bool CTokensView::RevertCreateToken(const uint256 & txid)
     return true;
 }
 
-bool CTokensView::DestroyToken(DCT_ID id, const uint256 & txid, int height)
+bool CTokensView::DestroyToken(uint256 const & tokenTx, const uint256 & txid, int height)
 {
-    if (id < DCT_ID_START) {
-        LogPrintf("Token destruction error: trying to destroy stable token with DCT_ID %d\n", id);
-        return false;
-    }
-    auto token = ExistToken(id);
-    if (!token) {
-        LogPrintf("Token destruction error: token with DCT_ID %d does not exist!\n", id);
+    auto pair = ExistTokenByCreationTx(tokenTx);
+    if (!pair) {
+        LogPrintf("Token destruction error: token with creationTx %s does not exist!\n", tokenTx.ToString());
         return false;
     }
     /// @todo token: check for token supply / utxos
 
-    CTokenImpl* tokenImpl = static_cast<CTokenImplementation*>(token.get());
-    assert(tokenImpl);
-    if (tokenImpl->destructionTx != uint256{}) {
-        LogPrintf("Token destruction error: token with DCT_ID %d was already destroyed by tx %s!\n", id, tokenImpl->destructionTx.ToString());
+    CTokenImpl & tokenImpl = pair->second;
+    if (tokenImpl.destructionTx != uint256{}) {
+        LogPrintf("Token destruction error: token with creationTx %s was already destroyed by tx %s!\n", tokenTx.ToString(), tokenImpl.destructionTx.ToString());
         return false;
     }
 
-    tokenImpl->destructionTx = txid;
-    tokenImpl->destructionHeight = height;
-    WriteBy<ID>(WrapVarInt(id), *tokenImpl);
+    tokenImpl.destructionTx = txid;
+    tokenImpl.destructionHeight = height;
+    WriteBy<ID>(WrapVarInt(pair->first), tokenImpl);
     return true;
 }
 
-bool CTokensView::RevertDestroyToken(DCT_ID id, const uint256 & txid)
+bool CTokensView::RevertDestroyToken(uint256 const & tokenTx, const uint256 & txid)
 {
-    if (id < DCT_ID_START) {
-        LogPrintf("Token destruction revert error: trying to destroy stable token with DCT_ID %d\n", id);
+    auto pair = ExistTokenByCreationTx(tokenTx);
+    if (!pair) {
+        LogPrintf("Token destruction revert error: token with creationTx %s does not exist!\n", tokenTx.ToString());
         return false;
     }
-    auto token = ExistToken(id);
-    if (!token) {
-        LogPrintf("Token destruction revert error: token with DCT_ID %d does not exist!\n", id);
-        return false;
-    }
-    auto tokenImpl = static_cast<CTokenImpl*>(token.get());
-    assert(tokenImpl);
-    if (tokenImpl->destructionTx != txid) {
-        LogPrintf("Token destruction revert error: token with DCT_ID %d was not destroyed by tx %s!\n", id, txid.ToString());
+    CTokenImpl & tokenImpl = pair->second;
+    if (tokenImpl.destructionTx != txid) {
+        LogPrintf("Token destruction revert error: token with creationTx %s was not destroyed by tx %s!\n", tokenTx.ToString(), txid.ToString());
         return false;
     }
 
-    tokenImpl->destructionTx = uint256{};
-    tokenImpl->destructionHeight = -1;
-    WriteBy<ID>(WrapVarInt(id), *tokenImpl);
+    tokenImpl.destructionTx = uint256{};
+    tokenImpl.destructionHeight = -1;
+    WriteBy<ID>(WrapVarInt(pair->first), tokenImpl);
     return true;
 }
 
@@ -240,9 +246,11 @@ DCT_ID CTokensView::DecrementLastDctId()
 
 boost::optional<DCT_ID> CTokensView::ReadLastDctId() const
 {
-    DCT_ID lastDctId;
+    DCT_ID lastDctId{DCT_ID_START};
     if (Read(LastDctId::prefix, lastDctId)) {
         return {lastDctId};
     }
     return {};
 }
+
+
