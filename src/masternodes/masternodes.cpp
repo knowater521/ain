@@ -9,7 +9,6 @@
 
 #include <chainparams.h>
 #include <net_processing.h>
-//#include <primitives/block.h>
 #include <primitives/transaction.h>
 #include <script/script.h>
 #include <script/standard.h>
@@ -52,16 +51,26 @@ int GetMnHistoryFrame()
     return Params().GetConsensus().mn.historyFrame;
 }
 
-
 CAmount GetMnCollateralAmount()
 {
     return Params().GetConsensus().mn.collateralAmount;
 }
 
-CAmount GetMnCreationFee(int height)
+CAmount GetMnCreationFee(int)
 {
     return Params().GetConsensus().mn.creationFee;
 }
+
+CAmount GetTokenCollateralAmount()
+{
+    return Params().GetConsensus().token.collateralAmount;
+}
+
+CAmount GetTokenCreationFee(int)
+{
+    return Params().GetConsensus().token.creationFee;
+}
+
 
 CMasternode::CMasternode()
     : mintedBlocks(0)
@@ -216,96 +225,7 @@ bool operator!=(CDoubleSignFact const & a, CDoubleSignFact const & b)
 //}
 
 
-/*
- *  CCustomCSView
- */
-CTeamView::CTeam CCustomCSView::CalcNextTeam(const uint256 & stakeModifier)
-{
-    int anchoringTeamSize = Params().GetConsensus().mn.anchoringTeamSize;
 
-    std::map<arith_uint256, CKeyID, std::less<arith_uint256>> priorityMN;
-    ForEachMasternode([&stakeModifier, &priorityMN] (uint256 const & id, CMasternode & node) {
-        if(!node.IsActive())
-            return true;
-
-        CDataStream ss{SER_GETHASH, PROTOCOL_VERSION};
-        ss << id << stakeModifier;
-        priorityMN.insert(std::make_pair(UintToArith256(Hash(ss.begin(), ss.end())), node.operatorAuthAddress));
-        return true;
-    });
-
-    CTeam newTeam;
-    auto && it = priorityMN.begin();
-    for (int i = 0; i < anchoringTeamSize && it != priorityMN.end(); ++i, ++it) {
-        newTeam.insert(it->second);
-    }
-    return newTeam;
-}
-
-/// @todo newbase move to networking?
-void CCustomCSView::CreateAndRelayConfirmMessageIfNeed(const CAnchor & anchor, const uint256 & btcTxHash)
-{
-    /// @todo refactor to use AmISignerNow()
-    auto myIDs = AmIOperator();
-    if (!myIDs || !ExistMasternode(myIDs->second)->IsActive())
-        return ;
-    CKeyID const & operatorAuthAddress = myIDs->first;
-    CTeam const currentTeam = GetCurrentTeam();
-    if (currentTeam.find(operatorAuthAddress) == currentTeam.end()) {
-        LogPrintf("AnchorConfirms::CreateAndRelayConfirmMessageIfNeed: Warning! I am not in a team %s\n", operatorAuthAddress.ToString());
-        return ;
-    }
-
-    std::vector<std::shared_ptr<CWallet>> wallets = GetWallets();
-    CKey masternodeKey{};
-    for (auto const wallet : wallets) {
-        if (wallet->GetKey(operatorAuthAddress, masternodeKey)) {
-            break;
-        }
-        masternodeKey = CKey{};
-    }
-
-    if (!masternodeKey.IsValid()) {
-        LogPrintf("AnchorConfirms::CreateAndRelayConfirmMessageIfNeed: Warning! Masternodes is't valid %s\n", operatorAuthAddress.ToString());
-        // return error("%s: Can't read masternode operator private key", __func__);
-        return ;
-    }
-
-    auto prev = panchors->ExistAnchorByTx(anchor.previousAnchor);
-    auto confirmMessage = CAnchorConfirmMessage::Create(anchor, prev? prev->anchor.height : 0, btcTxHash, masternodeKey);
-    if (panchorAwaitingConfirms->Add(confirmMessage)) {
-        LogPrintf("AnchorConfirms::CreateAndRelayConfirmMessageIfNeed: Create message %s\n", confirmMessage.GetHash().GetHex());
-        RelayAnchorConfirm(confirmMessage.GetHash(), *g_connman);
-    }
-    else {
-        LogPrintf("AnchorConfirms::CreateAndRelayConfirmMessageIfNeed: Warning! not need relay %s because message (or vote!) already exist\n", confirmMessage.GetHash().GetHex());
-    }
-
-}
-
-/// @todo refactor to split dependencies
-void CCustomCSView::OnUndoTx(const CTransaction & tx)
-{
-    TBytes metadata;
-    CustomTxType txType = GuessCustomTxType(tx, metadata);
-
-    uint256 txid = tx.GetHash();
-    switch (txType) {
-        case CustomTxType::CreateMasternode:
-        {
-            UnCreateMasternode(txid);
-        }
-        break;
-        case CustomTxType::ResignMasternode:
-        {
-            uint256 nodeId(metadata);
-            UnResignMasternode(nodeId, txid);
-        }
-        break;
-        default:
-        break;
-    }
-}
 
 /*
  *  CMasternodesView
@@ -328,13 +248,6 @@ boost::optional<uint256> CMasternodesView::ExistMasternodeByOwner(const CKeyID &
 void CMasternodesView::ForEachMasternode(std::function<bool (const uint256 &, CMasternode &)> callback)
 {
     ForEach<ID, uint256, CMasternode>(callback);
-}
-
-bool CMasternodesView::CanSpend(const uint256 & nodeId, int height) const
-{
-    auto node = ExistMasternode(nodeId);
-    // if not exist or (resigned && delay passed)
-    return !node || (node->GetState(height) == CMasternode::RESIGNED) || (node->GetState(height) == CMasternode::BANNED);
 }
 
 void CMasternodesView::IncrementMintedBy(const CKeyID & minter)
@@ -557,3 +470,120 @@ void CAnchorRewardsView::ForEachAnchorReward(std::function<bool (const CAnchorRe
 {
     ForEach<BtcTx, AnchorTxHash, RewardTxHash>(callback);
 }
+
+/*
+ *  CCustomCSView
+ */
+CTeamView::CTeam CCustomCSView::CalcNextTeam(const uint256 & stakeModifier)
+{
+    int anchoringTeamSize = Params().GetConsensus().mn.anchoringTeamSize;
+
+    std::map<arith_uint256, CKeyID, std::less<arith_uint256>> priorityMN;
+    ForEachMasternode([&stakeModifier, &priorityMN] (uint256 const & id, CMasternode & node) {
+        if(!node.IsActive())
+            return true;
+
+        CDataStream ss{SER_GETHASH, PROTOCOL_VERSION};
+        ss << id << stakeModifier;
+        priorityMN.insert(std::make_pair(UintToArith256(Hash(ss.begin(), ss.end())), node.operatorAuthAddress));
+        return true;
+    });
+
+    CTeam newTeam;
+    auto && it = priorityMN.begin();
+    for (int i = 0; i < anchoringTeamSize && it != priorityMN.end(); ++i, ++it) {
+        newTeam.insert(it->second);
+    }
+    return newTeam;
+}
+
+/// @todo newbase move to networking?
+void CCustomCSView::CreateAndRelayConfirmMessageIfNeed(const CAnchor & anchor, const uint256 & btcTxHash)
+{
+    /// @todo refactor to use AmISignerNow()
+    auto myIDs = AmIOperator();
+    if (!myIDs || !ExistMasternode(myIDs->second)->IsActive())
+        return ;
+    CKeyID const & operatorAuthAddress = myIDs->first;
+    CTeam const currentTeam = GetCurrentTeam();
+    if (currentTeam.find(operatorAuthAddress) == currentTeam.end()) {
+        LogPrintf("AnchorConfirms::CreateAndRelayConfirmMessageIfNeed: Warning! I am not in a team %s\n", operatorAuthAddress.ToString());
+        return ;
+    }
+
+    std::vector<std::shared_ptr<CWallet>> wallets = GetWallets();
+    CKey masternodeKey{};
+    for (auto const wallet : wallets) {
+        if (wallet->GetKey(operatorAuthAddress, masternodeKey)) {
+            break;
+        }
+        masternodeKey = CKey{};
+    }
+
+    if (!masternodeKey.IsValid()) {
+        LogPrintf("AnchorConfirms::CreateAndRelayConfirmMessageIfNeed: Warning! Masternodes is't valid %s\n", operatorAuthAddress.ToString());
+        // return error("%s: Can't read masternode operator private key", __func__);
+        return ;
+    }
+
+    auto prev = panchors->ExistAnchorByTx(anchor.previousAnchor);
+    auto confirmMessage = CAnchorConfirmMessage::Create(anchor, prev? prev->anchor.height : 0, btcTxHash, masternodeKey);
+    if (panchorAwaitingConfirms->Add(confirmMessage)) {
+        LogPrintf("AnchorConfirms::CreateAndRelayConfirmMessageIfNeed: Create message %s\n", confirmMessage.GetHash().GetHex());
+        RelayAnchorConfirm(confirmMessage.GetHash(), *g_connman);
+    }
+    else {
+        LogPrintf("AnchorConfirms::CreateAndRelayConfirmMessageIfNeed: Warning! not need relay %s because message (or vote!) already exist\n", confirmMessage.GetHash().GetHex());
+    }
+
+}
+
+/// @todo refactor to split dependencies
+void CCustomCSView::OnUndoTx(const CTransaction & tx)
+{
+    TBytes metadata;
+    CustomTxType txType = GuessCustomTxType(tx, metadata);
+
+    uint256 txid = tx.GetHash();
+    switch (txType) {
+        case CustomTxType::CreateMasternode:
+        {
+            UnCreateMasternode(txid);
+        }
+        break;
+        case CustomTxType::ResignMasternode:
+        {
+            uint256 nodeId(metadata);
+            UnResignMasternode(nodeId, txid);
+        }
+        break;
+        case CustomTxType::CreateToken:
+        {
+            RevertCreateToken(txid);
+        }
+        break;
+        case CustomTxType::DestroyToken:
+        {
+            uint256 tokenId(metadata);
+            RevertDestroyToken(tokenId, txid);
+        }
+        break;
+        default:
+        break;
+    }
+}
+
+bool CCustomCSView::CanSpend(const uint256 & txId, int height) const
+{
+    auto node = ExistMasternode(txId);
+    // check if it was mn collateral and mn was resigned or banned
+    if (node) {
+        auto state = node->GetState(height);
+        return state == CMasternode::RESIGNED || state == CMasternode::BANNED;
+    }
+    // check if it was token collateral and token already destroyed
+    /// @todo token check for total supply/limit when implemented
+    auto pair = ExistTokenByCreationTx(txId);
+    return !pair || pair->second.destructionTx != uint256{};
+}
+

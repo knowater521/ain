@@ -513,7 +513,7 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
         } else {
             for (const CTxIn& txin : tx.vin) {
 
-                if (txin.prevout.n == 1 && (!pcustomcsview->CanSpend(txin.prevout.hash, nMemPoolHeight) || IsMempooledMnCreate(*this, txin.prevout.hash)))
+                if (txin.prevout.n == 1 && (!pcustomcsview->CanSpend(txin.prevout.hash, nMemPoolHeight) || IsMempooledCustomTxCreate(*this, txin.prevout.hash)))
                 {
                     txToRemove.insert(it);
                     break;

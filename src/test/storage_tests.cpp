@@ -107,9 +107,10 @@ BOOST_AUTO_TEST_CASE(tokens)
     }
 
     // destroy token
-    BOOST_REQUIRE(pcustomcsview->DestroyToken(0, uint256S("0x2222"), 999) == false); // stable coin!
-    BOOST_REQUIRE(pcustomcsview->DestroyToken(42, uint256S("0x2222"), 999) == false); // nonexist
-    BOOST_REQUIRE(pcustomcsview->DestroyToken(129, uint256S("0xaaaa"), 999));  // ok!
+//    BOOST_REQUIRE(pcustomcsview->DestroyToken(0, uint256S("0x2222"), 999) == false); // stable coin!
+    BOOST_REQUIRE(pcustomcsview->DestroyToken(uint256S("0x3333"), uint256S("0xaaaa"), 999) == false); // nonexist
+    BOOST_REQUIRE(pcustomcsview->DestroyToken(uint256S("0x2222"), uint256S("0xaaaa"), 999)); // ok
+    BOOST_REQUIRE(pcustomcsview->DestroyToken(uint256S("0x2222"), uint256S("0xbbbb"), 999) == false); // already destroyed
     {   // search by id
         auto token = pcustomcsview->ExistToken(129);
         BOOST_REQUIRE(token);
@@ -119,10 +120,11 @@ BOOST_AUTO_TEST_CASE(tokens)
     }
 
     // revert destroy token
-    BOOST_REQUIRE(pcustomcsview->RevertDestroyToken(0, uint256S("0x2222")) == false); // stable coin!
-    BOOST_REQUIRE(pcustomcsview->RevertDestroyToken(128, uint256S("0x2222")) == false); // not destroyed, active
-    BOOST_REQUIRE(pcustomcsview->RevertDestroyToken(129, uint256S("0x2222")) == false); // destroyed, but wrong tx for revert
-    BOOST_REQUIRE(pcustomcsview->RevertDestroyToken(129, uint256S("0xaaaa"))); // ok!
+//    BOOST_REQUIRE(pcustomcsview->RevertDestroyToken(0, uint256S("0x2222")) == false); // stable coin!
+    BOOST_REQUIRE(pcustomcsview->RevertDestroyToken(uint256S("0x3333"), uint256S("0xaaaa")) == false); // nonexist
+    BOOST_REQUIRE(pcustomcsview->RevertDestroyToken(uint256S("0x1111"), uint256S("0xaaaa")) == false); // not destroyed, active
+    BOOST_REQUIRE(pcustomcsview->RevertDestroyToken(uint256S("0x2222"), uint256S("0xbbbb")) == false); // destroyed, but wrong tx for revert
+    BOOST_REQUIRE(pcustomcsview->RevertDestroyToken(uint256S("0x2222"), uint256S("0xaaaa"))); // ok!
     {   // search by id
         auto token = pcustomcsview->ExistToken(129);
         BOOST_REQUIRE(token);
