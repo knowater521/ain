@@ -46,11 +46,14 @@ extern void FundTransaction(CWallet* const pwallet, CMutableTransaction& tx, CAm
 
 static UniValue fundsignsend(CMutableTransaction & mtx, JSONRPCRequest const & request, CWallet* const pwallet)
 {
-    CAmount fee;
-    int change_position;
-    UniValue options(UniValue::VOBJ);
-    options.pushKV("changePosition", mtx.vout.size());
-    FundTransaction(pwallet, mtx, fee, change_position, options);
+    CAmount fee_out;
+    int change_position = mtx.vout.size();
+
+    std::string strFailReason;
+    CCoinControl coinControl;
+    if (!pwallet->FundTransaction(mtx, fee_out, change_position, strFailReason, false /*lockUnspents*/, std::set<int>() /*setSubtractFeeFromOutputs*/, coinControl)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, strFailReason);
+    }
 
     JSONRPCRequest new_request;
     new_request.id = request.id;
@@ -270,6 +273,7 @@ UniValue resignmasternode(const JSONRPCRequest& request)
     uint256 nodeId = uint256S(nodeIdStr);
     CTxDestination ownerDest;
     {
+        pwallet->BlockUntilSyncedToCurrentChain();
         auto locked_chain = pwallet->chain().lock();
         auto optIDs = pcustomcsview->AmIOwner();
         if (!optIDs)
@@ -528,6 +532,9 @@ UniValue createtoken(const JSONRPCRequest& request)
     }
 
     std::string symbol = metaObj["symbol"].getValStr().substr(0, CToken::MAX_TOKEN_SYMBOL_LENGTH);
+    if (symbol.size() == 0 || IsDigit(symbol[0])) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Token symbol '" + symbol + "' should be non-empty and starts with a letter");
+    }
     int height{0};
     {
         auto locked_chain = pwallet->chain().lock();
@@ -587,8 +594,8 @@ UniValue destroytoken(const JSONRPCRequest& request)
             "\"hex\"                      (string) The hex-encoded raw transaction with signature(s)\n"
         },
         RPCExamples{
-            HelpExampleCli("resignmasternode", "\"[{\\\"txid\\\":\\\"id\\\",\\\"vout\\\":0}]\" \"symbol\"")
-            + HelpExampleRpc("resignmasternode", "\"[{\\\"txid\\\":\\\"id\\\",\\\"vout\\\":0}]\" \"symbol\"")
+            HelpExampleCli("destroytoken", "\"[{\\\"txid\\\":\\\"id\\\",\\\"vout\\\":0}]\" \"symbol\"")
+            + HelpExampleRpc("destroytoken", "\"[{\\\"txid\\\":\\\"id\\\",\\\"vout\\\":0}]\" \"symbol\"")
         },
     }.Check(request);
 
@@ -602,6 +609,7 @@ UniValue destroytoken(const JSONRPCRequest& request)
     CTxDestination ownerDest;
     uint256 creationTx{};
     {
+        pwallet->BlockUntilSyncedToCurrentChain();
         auto locked_chain = pwallet->chain().lock();
         auto pair = pcustomcsview->ExistToken(symbol);
         if (!pair) {
@@ -660,6 +668,29 @@ UniValue destroytoken(const JSONRPCRequest& request)
     return fundsignsend(rawTx, request, pwallet);
 }
 
+UniValue tokenToJSON(DCT_ID const & id, CToken const & token, bool verbose)
+{
+    UniValue tokenObj(UniValue::VOBJ);
+    tokenObj.pushKV("symbol", token.symbol);
+    tokenObj.pushKV("name", token.name);
+    if (verbose) {
+        tokenObj.pushKV("decimal", token.decimal);
+        tokenObj.pushKV("limit", token.limit);
+        tokenObj.pushKV("mintable",  token.IsMintable());
+        tokenObj.pushKV("tradeable", token.IsTradeable());
+        if (id >= CTokensView::DCT_ID_START) {
+            CTokenImplementation const & tokenImpl = static_cast<CTokenImplementation const &>(token);
+            tokenObj.pushKV("creationTx", tokenImpl.creationTx.ToString());
+            tokenObj.pushKV("creationHeight", tokenImpl.creationHeight);
+            tokenObj.pushKV("destructionTx", tokenImpl.destructionTx.ToString());
+            tokenObj.pushKV("destructionHeight", tokenImpl.destructionHeight);
+            /// @todo tokens: collateral address/script
+//            tokenObj.pushKV("collateralAddress", tokenImpl.destructionHeight);
+        }
+    }
+    return tokenObj;
+}
+
 UniValue listtokens(const JSONRPCRequest& request)
 {
     CWallet* const pwallet = GetWallet(request);
@@ -667,51 +698,220 @@ UniValue listtokens(const JSONRPCRequest& request)
     RPCHelpMan{"listtokens",
         "\nReturns information about tokens.\n",
         {
+            {"key", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "One of the keys may be specified (id/symbol/creationTx), otherwise all tokens listed"},
             {"verbose", RPCArg::Type::BOOL, RPCArg::Optional::OMITTED, "Flag for verbose list (default = true), otherwise only ids and names listed"},
         },
         RPCResult{
             "{id:{...},...}     (array) Json object with tokens information\n"
         },
         RPCExamples{
-            HelpExampleCli("listtokens", "False")
-            + HelpExampleRpc("listtokens", "False")
+            HelpExampleCli("listtokens", "GOLD False")
+            + HelpExampleRpc("listtokens", "GOLD False")
         },
     }.Check(request);
 
-    RPCTypeCheck(request.params, { UniValue::VBOOL }, true);
-
     bool verbose = true;
-    if (request.params.size()) {
-        verbose = request.params[0].get_bool();
+    if (request.params.size() > 1) {
+        verbose = request.params[1].get_bool();
     }
 
     auto locked_chain = pwallet->chain().lock();
 
     UniValue ret(UniValue::VOBJ);
-    // Dumps all!
-    pcustomcsview->ForEachToken([&ret, verbose] (DCT_ID const & id, CToken const & token) {
-        UniValue tokenObj(UniValue::VOBJ);
-        tokenObj.pushKV("symbol", token.symbol);
-        tokenObj.pushKV("name", token.name);
-        if (verbose) {
-            tokenObj.pushKV("decimal", token.decimal);
-            tokenObj.pushKV("limit", token.limit);
-            tokenObj.pushKV("mintable",  token.IsMintable());
-            tokenObj.pushKV("tradeable", token.IsTradeable());
-            if (id >= CTokensView::DCT_ID_START) {
-                CTokenImplementation const & tokenImpl = static_cast<CTokenImplementation const &>(token);
-                tokenObj.pushKV("creationTx", tokenImpl.creationTx.ToString());
-                tokenObj.pushKV("creationHeight", tokenImpl.creationHeight);
-                tokenObj.pushKV("destructionTx", tokenImpl.destructionTx.ToString());
-                tokenObj.pushKV("destructionHeight", tokenImpl.destructionHeight);
-                /// @todo tokens: collateral address/script
-//                tokenObj.pushKV("collateralAddress", tokenImpl.destructionHeight);
+    if (request.params.size()) {
+        UniValue key = request.params[0];
+        if (key.getType() == UniValue::VNUM) {
+            auto id = key.get_int();
+            auto tokenPtr = pcustomcsview->ExistToken(id);
+            if (tokenPtr) {
+                ret.pushKV(std::to_string(id), tokenToJSON(id, *tokenPtr, verbose));
             }
         }
-        ret.pushKV(std::to_string(id), tokenObj);
+        else if (request.params[0].getType() == UniValue::VSTR) {
+            std::string key = request.params[0].getValStr();
+            uint256 tx;
+            if (ParseHashStr(key, tx)) {
+                auto pair = pcustomcsview->ExistTokenByCreationTx(tx);
+                if (pair) {
+                    ret.pushKV(std::to_string(pair->first), tokenToJSON(pair->first, pair->second, verbose));
+                }
+            }
+            else {
+                auto pair = pcustomcsview->ExistToken(key);
+                if (pair) {
+                    ret.pushKV(std::to_string(pair->first), tokenToJSON(pair->first, *pair->second, verbose));
+                }
+            }
+        }
+        return ret;
+    }
+
+    // Dumps all!
+    pcustomcsview->ForEachToken([&ret, verbose] (DCT_ID const & id, CToken const & token) {
+        ret.pushKV(std::to_string(id), tokenToJSON(id, token, verbose));
         return true;
     });
     return ret;
+}
+
+UniValue minttokens(const JSONRPCRequest& request)
+{
+    CWallet* const pwallet = GetWallet(request);
+
+    RPCHelpMan{"minttokens",
+        "\nCreates (and submits to local node and network) a transaction minting your token. \n"
+        "The first optional argument (may be empty array) is an array of specific UTXOs to spend. One of UTXO's must belong to the token's owner (collateral) address" +
+            HelpRequiringPassphrase(pwallet) + "\n",
+        {
+            {"inputs", RPCArg::Type::ARR, RPCArg::Optional::OMITTED_NAMED_ARG, "A json array of json objects. Provide it if you want to spent specific UTXOs",
+                {
+                    {"", RPCArg::Type::OBJ, RPCArg::Optional::OMITTED, "",
+                        {
+                            {"txid", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The transaction id"},
+                            {"vout", RPCArg::Type::NUM, RPCArg::Optional::NO, "The output number"},
+                        },
+                    },
+                },
+            },
+            {"symbol", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The tokens's symbol"},
+            {"amounts", RPCArg::Type::OBJ, RPCArg::Optional::NO, "A json object with addresses and amounts",
+                {
+                    {"address", RPCArg::Type::AMOUNT, RPCArg::Optional::NO, "The defi address is the key, the numeric amount (can be string) in " + CURRENCY_UNIT + " is the value"},
+                },
+            },
+        },
+        RPCResult{
+            "\"hex\"                      (string) The hex-encoded raw transaction with signature(s)\n"
+        },
+        RPCExamples{
+            HelpExampleCli("minttokens", "\"[{\\\"txid\\\":\\\"id\\\",\\\"vout\\\":0}]\" \"symbol\"")  /// @todo tokens: modify
+            + HelpExampleRpc("minttokens", "\"[{\\\"txid\\\":\\\"id\\\",\\\"vout\\\":0}]\" \"symbol\"")
+        },
+    }.Check(request);
+
+//    throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Temporary OFF until wallet with tokens completely implemented!");
+
+    if (pwallet->chain().isInitialBlockDownload()) {
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Cannot resign Masternode while still in Initial Block Download");
+    }
+
+    RPCTypeCheck(request.params, { UniValue::VARR, UniValue::VSTR }, true);
+
+    std::string const symbol = request.params[1].getValStr();
+    UniValue sendTo = request.params[2].get_obj();
+
+    CTxDestination ownerDest;
+    DCT_ID tokenId{};
+    {
+        auto locked_chain = pwallet->chain().lock();
+        auto pair = pcustomcsview->ExistToken(symbol);
+        if (!pair) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Token %s does not exist!", symbol));
+        }
+        if (pair->first < CTokensView::DCT_ID_START) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Token %s is a 'stable coin'", symbol));
+        }
+        auto token = static_cast<CTokenImplementation const & >(*pair->second);
+        if (token.destructionTx != uint256{}) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Token %s already destroyed at height %i by tx %s", symbol, token.destructionHeight, token.destructionTx.GetHex()));
+        }
+        LOCK(pwallet->cs_wallet);
+        auto wtx = pwallet->GetWalletTx(token.creationTx);
+        if (!wtx || !ExtractDestination(wtx->tx->vout[1].scriptPubKey, ownerDest)) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Can't extract destination for token's %s collateral", symbol));
+        }
+        tokenId = pair->first;
+    }
+
+    std::set<CTxDestination> destinations; // just for duplication control
+    std::vector<CTxOut> vecSend;
+
+    std::vector<std::string> keys = sendTo.getKeys();
+    for (const std::string& name_ : keys) {
+        CTxDestination dest = DecodeDestination(name_);
+        if (!IsValidDestination(dest)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Defi address: ") + name_);
+        }
+
+        if (destinations.count(dest)) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid parameter, duplicated address: ") + name_);
+        }
+        destinations.insert(dest);
+
+        CScript scriptPubKey = GetScriptForDestination(dest);
+        CAmount nAmount = AmountFromValue(sendTo[name_]);
+        if (nAmount <= 0)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send");
+
+        vecSend.push_back(CTxOut(nAmount, scriptPubKey, tokenId));
+    }
+
+    CMutableTransaction rawTx;
+
+    UniValue inputs = request.params[0].get_array();
+    if (inputs.size() > 0) {
+        FillInputs(request.params[0].get_array(), rawTx);
+    }
+    else {
+        std::vector<COutput> vecOutputs;
+        CCoinControl cctl;
+        cctl.m_avoid_address_reuse = false;
+        cctl.m_min_depth = 1;
+        cctl.m_max_depth = 9999999;
+        cctl.matchDestination = ownerDest;
+
+        pwallet->BlockUntilSyncedToCurrentChain();
+        auto locked_chain = pwallet->chain().lock();
+        LOCK(pwallet->cs_wallet);
+
+        pwallet->AvailableCoins(*locked_chain, vecOutputs, true, &cctl, 1, MAX_MONEY, MAX_MONEY, 1);
+
+        if (vecOutputs.size() == 0) {
+            throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, strprintf("Can't find any UTXO's for token's owner. Are you an owner? If so, send some coins matching collateral address %s and try again!", EncodeDestination(ownerDest)));
+        }
+        rawTx.vin.push_back(CTxIn(vecOutputs[0].tx->GetHash(), vecOutputs[0].i));
+    }
+
+    CDataStream metadata(DfTxMarker, SER_NETWORK, PROTOCOL_VERSION);
+    metadata << static_cast<unsigned char>(CustomTxType::MintToken);
+
+    CScript scriptMeta;
+    scriptMeta << OP_RETURN << ToByteVector(metadata);
+
+    rawTx.vout.push_back(CTxOut(0, scriptMeta));
+    rawTx.vout.insert(rawTx.vout.end(), vecSend.begin(), vecSend.end());
+
+    // Now try to fund and sign manually:
+
+    CTransactionRef tx_new;
+    {
+        CCoinControl coinControl;
+        coinControl.fAllowOtherInputs = true;
+
+        for (const CTxIn& txin : rawTx.vin) {
+            coinControl.Select(txin.prevout);
+        }
+
+        auto locked_chain = pwallet->chain().lock();
+        LOCK(pwallet->cs_wallet);
+        CAmount nFeeRet;
+        std::string strFailReason;
+        int changePos = rawTx.vout.size();
+
+        if (!pwallet->CreateMintTokenTransaction(*locked_chain, rawTx, tx_new, nFeeRet, changePos, strFailReason, coinControl)) {
+            throw JSONRPCError(RPC_WALLET_ERROR, strFailReason);
+        }
+
+    }
+    CAmount max_raw_tx_fee = {COIN / 10}; /// @todo check it with 0
+    std::string err_string;
+    AssertLockNotHeld(cs_main);
+    const TransactionError err = BroadcastTransaction(tx_new, err_string, max_raw_tx_fee, /*relay*/ true, /*wait_callback*/ false);
+    if (TransactionError::OK != err) {
+        throw JSONRPCTransactionError(err, err_string);
+    }
+
+    return tx_new->GetHash().GetHex();
 }
 
 static const CRPCCommand commands[] =
@@ -723,7 +923,8 @@ static const CRPCCommand commands[] =
   { "masternodes",      "listcriminalproofs",       &listcriminalproofs,        { } },
   { "tokens",           "createtoken",              &createtoken,               { "inputs", "metadata" } },
   { "tokens",           "destroytoken",             &destroytoken,              { "inputs", "symbol" } },
-  { "tokens",           "listtokens",               &listtokens,                { "verbose" } },
+  { "tokens",           "listtokens",               &listtokens,                { "key", "verbose" } },
+  { "tokens",           "minttokens",               &minttokens,                { "inputs", "symbol", "amounts" } },
 };
 
 void RegisterMasternodesRPCCommands(CRPCTable &tableRPC)
