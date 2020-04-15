@@ -21,6 +21,7 @@ class TokensRpcBasicTest (DefiTestFramework):
 
     def run_test(self):
         assert_equal(len(self.nodes[0].listtokens()), 1) # only one token == DFI
+
         self.nodes[0].generate(100)
         self.sync_all()
 
@@ -70,6 +71,18 @@ class TokensRpcBasicTest (DefiTestFramework):
         assert_equal(tokens['128']["symbol"], "GOLD")
         assert_equal(tokens['128']["creationTx"], tokenTx)
 
+        # Check 'listtokens' output
+        t0 = self.nodes[0].listtokens(0)
+        assert_equal(len(t0), 1)
+        assert_equal(t0['0']['symbol'], "DFI")
+        assert_equal(self.nodes[0].listtokens("DFI"), t0)
+        t128 = self.nodes[0].listtokens(128)
+        assert_equal(len(t128), 1)
+        assert_equal(t128['128']['symbol'], "GOLD")
+        assert_equal(self.nodes[0].listtokens("GOLD"), t128)
+        assert_equal(self.nodes[0].listtokens(tokenTx), t128)
+
+
         self.sync_blocks(self.nodes[0:2])
         # Stop node #1 for future revert
         self.stop_node(1)
@@ -93,6 +106,10 @@ class TokensRpcBasicTest (DefiTestFramework):
         # Funding auth address and successful resign
         fundingTx = self.nodes[0].sendtoaddress(collateral0, 1)
         self.nodes[0].generate(1)
+
+        # self.nodes[0].minttokens([], "GOLD", { self.nodes[0].getnewaddress("", "legacy"): 100 })
+
+
 
         destroyTx = self.nodes[0].destroytoken([], "GOLD")
         self.nodes[0].generate(1)
