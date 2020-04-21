@@ -952,6 +952,7 @@ public:
     }
 
     int GetVersion() const { return nVersion; }
+    int GetType() const { return 0; } // dummy
 };
 
 template<typename Stream>

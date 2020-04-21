@@ -160,7 +160,7 @@ int64_t GetTransactionSigOpCost(const CTransaction& tx, const CCoinsViewCache& i
     return nSigOps;
 }
 
-bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, const CMasternodesView * mnview, int nSpendHeight, CAmount& txfee)
+bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, const CCustomCSView * mnview, int nSpendHeight, CAmount& txfee)
 {
     // are the actual inputs available?
     if (!inputs.HaveInputs(tx)) {
@@ -188,7 +188,7 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
 
         if (prevout.n == 1 && !mnview->CanSpend(prevout.hash, nSpendHeight))
         {
-            return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "mn-collateral-locked",
+            return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "collateral-locked",
                 strprintf("tried to spend locked collateral for %s", prevout.hash.ToString())); /// @todo may be somehow place the height of unlocking?
         }
     }

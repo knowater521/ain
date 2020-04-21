@@ -136,6 +136,7 @@ DEFI_CORE_H = \
   core_memusage.h \
   cuckoocache.h \
   flatfile.h \
+  flushablestorage.h \
   fs.h \
   httprpc.h \
   httpserver.h \
@@ -154,9 +155,10 @@ DEFI_CORE_H = \
   limitedmap.h \
   logging.h \
   masternodes/anchors.h \
+  masternodes/criminals.h \
   masternodes/masternodes.h \
   masternodes/mn_checks.h \
-  masternodes/mn_txdb.h \
+  masternodes/tokens.h \
   memusage.h \
   merkleblock.h \
   miner.h \
@@ -290,10 +292,11 @@ libdefi_server_a_SOURCES = \
   init.cpp \
   dbwrapper.cpp \
   masternodes/anchors.cpp \
+  masternodes/criminals.cpp \
   masternodes/masternodes.cpp \
   masternodes/mn_checks.cpp \
-  masternodes/mn_txdb.cpp \
   masternodes/mn_rpc.cpp \
+  masternodes/tokens.cpp \
   miner.cpp \
   net.cpp \
   net_processing.cpp \
