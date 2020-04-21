@@ -7,7 +7,8 @@
 
 #include <chainparamsseeds.h>
 #include <consensus/merkle.h>
-#include <masternodes/masternodes.h>
+//#include <masternodes/masternodes.h>
+#include <masternodes/mn_checks.h>
 #include <streams.h>
 #include <tinyformat.h>
 #include <util/system.h>
@@ -39,7 +40,7 @@ std::vector<CTransactionRef> CChainParams::CreateGenesisMasternodes()
         CKeyID operatorAuthKey = operatorDest.which() == 1 ? CKeyID(*boost::get<PKHash>(&operatorDest)) : CKeyID(*boost::get<WitnessV0KeyHash>(&operatorDest)) ;
         genesisTeam.insert(operatorAuthKey);
         CDataStream metadata(DfTxMarker, SER_NETWORK, PROTOCOL_VERSION);
-        metadata << static_cast<unsigned char>(MasternodesTxType::CreateMasternode)
+        metadata << static_cast<unsigned char>(CustomTxType::CreateMasternode)
                  << static_cast<char>(operatorDest.which()) << operatorAuthKey;
 
         CScript scriptMeta;
@@ -150,6 +151,9 @@ public:
         consensus.mn.anchoringTeamSize = 5;
         consensus.mn.anchoringFrequency = 15;
         consensus.mn.anchoringLag = 15;
+
+        consensus.token.creationFee = 1 * COIN;
+        consensus.token.collateralAmount = 1000 * COIN;
 
         consensus.spv.creationFee = 100000; // should be > bitcoin's dust
         consensus.spv.anchorSubsidy = 0 * COIN;
@@ -288,6 +292,9 @@ public:
         consensus.mn.anchoringFrequency = 15;
         consensus.mn.anchoringLag = 15;
 
+        consensus.token.creationFee = 1 * COIN;
+        consensus.token.collateralAmount = 100 * COIN;
+
         consensus.spv.creationFee = 100000; // should be > bitcoin's dust
         consensus.spv.wallet_xpub = "tpubD8NM49wHzwMsyudhd7UtBChQBykkT1KVAHU4UDjdXt8w8ZaFzEnjxH7Uhptno2YPE616KWCitmXtH5w1RZ4y8SaNBBMr1zcjYqy1ZBkFTRp";
         consensus.spv.anchors_address = "mtANGiuXturik8b3T7FVe6dV31v3AdEJUt";
@@ -405,6 +412,9 @@ public:
         consensus.mn.anchoringTeamSize = 8;
         consensus.mn.anchoringFrequency = 15;
         consensus.mn.anchoringLag = 15;
+
+        consensus.token.creationFee = 1 * COIN;
+        consensus.token.collateralAmount = 10 * COIN;
 
         consensus.spv.creationFee = 1000; // should be > bitcoin's dust
         consensus.spv.wallet_xpub = "tpubDA2Mn6LMJ35tYaA1Noxirw2WDzmgKEDKLRbSs2nwF8TTsm2iB6hBJmNjAAEbDqYzZLdThLykWDcytGzKDrjUzR9ZxdmSbFz7rt18vFRYjt9";
