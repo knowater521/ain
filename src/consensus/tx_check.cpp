@@ -9,6 +9,9 @@
 
 extern bool fIsFakeNet;
 
+extern bool IsCriminalProofTx(CTransaction const & tx, std::vector<unsigned char> & metadata);
+extern bool IsAnchorRewardTx(CTransaction const & tx, std::vector<unsigned char> & metadata);
+
 bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fCheckDuplicateInputs)
 {
     // Basic checks that don't depend on any context
@@ -45,7 +48,8 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fChe
 
     if (tx.IsCoinBase())
     {
-        if (tx.IsAnchorReward() || tx.IsCriminalDetention())
+        std::vector<unsigned char> dummy;
+        if (IsAnchorRewardTx(tx, dummy) || IsCriminalProofTx(tx, dummy))
             return true;
         if (tx.vin[0].scriptSig.size() < 2 || (fIsFakeNet && tx.vin[0].scriptSig.size() > 100))
             return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-cb-length");

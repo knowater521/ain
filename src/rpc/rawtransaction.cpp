@@ -1068,7 +1068,7 @@ UniValue decodepsbt(const JSONRPCRequest& request)
         UniValue in(UniValue::VOBJ);
         // UTXOs
         if (!input.witness_utxo.IsNull()) {
-            const CTxOut& txout = input.witness_utxo;
+            const CTxOut& txout = input.witness_utxo; /// @todo tokens: extend with correct txout version (and/or tokenid) when implemented
 
             UniValue out(UniValue::VOBJ);
 
@@ -1527,7 +1527,7 @@ UniValue utxoupdatepsbt(const JSONRPCRequest& request)
         const Coin& coin = view.AccessCoin(psbtx.tx->vin[i].prevout);
 
         if (IsSegWitOutput(provider, coin.out.scriptPubKey)) {
-            input.witness_utxo = coin.out;
+            input.witness_utxo = coin.out; /// @todo tokens: extend with correct txout version (and/or tokenid) when implemented
         }
 
         // Update script/keypath information using descriptor data.

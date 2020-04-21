@@ -274,13 +274,13 @@ public:
     bool mnCanSpend(const uint256 & nodeId, int height) const override
     {
         LOCK(cs_main);
-        return pmasternodesview->CanSpend(nodeId, height);
+        return pcustomcsview->CanSpend(nodeId, height);
     }
 
-    CMasternode const * mnExists(const uint256 & nodeId) const override
+    boost::optional<CMasternode> mnExists(const uint256 & nodeId) const override
     {
         LOCK(cs_main);
-        return pmasternodesview->ExistMasternode(nodeId);
+        return pcustomcsview->ExistMasternode(nodeId);
     }
 
     double guessVerificationProgress(const uint256& block_hash) override

@@ -26,7 +26,7 @@
 #include <key.h>
 #include <key_io.h>
 #include <masternodes/anchors.h>
-#include <masternodes/mn_txdb.h>
+#include <masternodes/criminals.h>
 #include <miner.h>
 #include <net.h>
 #include <net_permissions.h>
@@ -275,7 +275,9 @@ void Shutdown(InitInterfaces& interfaces)
         panchors.reset();
         panchorAwaitingConfirms.reset();
         panchorauths.reset();
-        pmasternodesview.reset();
+        pcustomcsview.reset();
+        pcustomcsDB.reset();
+        pcriminals.reset();
         pblocktree.reset();
     }
     for (const auto& client : interfaces.chain_clients) {
@@ -1566,9 +1568,14 @@ bool AppInitMain(InitInterfaces& interfaces)
                         _("Error reading from database, shutting down.").translated,
                         "", CClientUIInterface::MSG_ERROR);
                 });
-                pmasternodesview.reset();
-                pmasternodesview = MakeUnique<CMasternodesViewDB>(nMinDbCache << 20, false, fReset || fReindexChainState);
-                pmasternodesview->Load();
+
+                pcriminals.reset();
+                pcriminals = MakeUnique<CCriminalsView>(GetDataDir() / "criminals", nMinDbCache << 20, false, fReset || fReindexChainState);
+
+                pcustomcsDB.reset();
+                pcustomcsDB = MakeUnique<CStorageLevelDB>(GetDataDir() / "enhancedcs", nMinDbCache << 20, false, fReset || fReindexChainState);
+                pcustomcsview.reset();
+                pcustomcsview = MakeUnique<CCustomCSView>(*pcustomcsDB.get());
 
                 panchorauths.reset();
                 panchorauths = MakeUnique<CAnchorAuthIndex>();
@@ -1597,7 +1604,7 @@ bool AppInitMain(InitInterfaces& interfaces)
                 }
 
                 // ReplayBlocks is a no-op if we cleared the coinsviewdb with -reindex or -reindex-chainstate
-                if (!ReplayBlocks(chainparams, &::ChainstateActive().CoinsDB(), pmasternodesview.get())) {
+                if (!ReplayBlocks(chainparams, &::ChainstateActive().CoinsDB(), pcustomcsview.get())) {
                     strLoadError = _("Unable to replay blocks. You will need to rebuild the database using -reindex-chainstate.").translated;
                     break;
                 }
@@ -1885,7 +1892,7 @@ bool AppInitMain(InitInterfaces& interfaces)
     if(gArgs.GetBoolArg("-gen", DEFAULT_GENERATE)) {
         LOCK(cs_main);
 
-        auto myIDs = pmasternodesview->AmIOperator();
+        auto myIDs = pcustomcsview->AmIOperator();
         if (myIDs)
         {
             pos::ThreadStaker::Args stakerParams{};
@@ -1900,7 +1907,7 @@ bool AppInitMain(InitInterfaces& interfaces)
                 CKey minterKey;
                 bool found =false;
                 for (auto&& wallet : wallets) {
-                    if (wallet->GetKey(myIDs->operatorAuthAddress, minterKey)) {
+                    if (wallet->GetKey(myIDs->first, minterKey)) {
                         found = true;
                         break;
                     }
@@ -1910,14 +1917,14 @@ bool AppInitMain(InitInterfaces& interfaces)
                     return false;
                 }
 
-                CMasternode const & node = *pmasternodesview->ExistMasternode(myIDs->id);
+                CMasternode const node = *pcustomcsview->ExistMasternode(myIDs->second);
                 CTxDestination destination = node.ownerType == 1 ? CTxDestination(PKHash(node.ownerAuthAddress)) : CTxDestination(WitnessV0KeyHash(node.ownerAuthAddress));
 
                 CScript coinbaseScript = GetScriptForDestination(destination);
 
                 stakerParams.coinbaseScript = coinbaseScript;
                 stakerParams.minterKey = minterKey;
-                stakerParams.masternodeID = myIDs->id;
+                stakerParams.masternodeID = myIDs->second;
             }
 
             // Mint proof-of-stake blocks in background
