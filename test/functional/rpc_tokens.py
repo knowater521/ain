@@ -105,11 +105,15 @@ class TokensRpcBasicTest (DefiTestFramework):
 
         # Funding auth address and successful resign
         fundingTx = self.nodes[0].sendtoaddress(collateral0, 1)
+        fundingTx2 = self.nodes[0].sendtoaddress(collateral0, 1)
         self.nodes[0].generate(1)
 
-        # self.nodes[0].minttokens([], "GOLD", { self.nodes[0].getnewaddress("", "legacy"): 100 })
+        mintingTx = self.nodes[0].minttokens([], "GOLD", { self.nodes[0].getnewaddress("", "legacy"): 100 })
+        self.nodes[0].generate(1)
 
-
+        # input ("pause")
+        print (self.nodes[0].listunspent(0, 9999999, [], True, {"tokenId": 128}))
+        # input ("pause")
 
         destroyTx = self.nodes[0].destroytoken([], "GOLD")
         self.nodes[0].generate(1)
@@ -129,25 +133,25 @@ class TokensRpcBasicTest (DefiTestFramework):
 
         # Revert token destruction!
         self.start_node(1)
-        self.nodes[1].generate(3)
+        self.nodes[1].generate(4)
         # Check that collateral spending tx is still in the mempool
         assert_equal(sendedTxHash, self.nodes[0].getrawmempool()[0])
 
         connect_nodes_bi(self.nodes, 0, 1)
         self.sync_blocks(self.nodes[0:2])
 
-        assert_equal(self.nodes[0].getrawmempool(), [fundingTx, destroyTx])
+        assert_equal(sorted(self.nodes[0].getrawmempool()), sorted([fundingTx, destroyTx, fundingTx2, mintingTx]))
         assert_equal(self.nodes[0].listtokens()['128']['destructionHeight'], -1)
         assert_equal(self.nodes[0].listtokens()['128']['destructionTx'], '0000000000000000000000000000000000000000000000000000000000000000')
 
         # Revert creation!
         self.start_node(2)
 
-        self.nodes[2].generate(6)
+        self.nodes[2].generate(7)
         connect_nodes_bi(self.nodes, 0, 2)
         self.sync_blocks(self.nodes[0:3])
         assert_equal(len(self.nodes[0].listtokens()), 1)
-        assert_equal(self.nodes[0].getrawmempool(), [tokenTx, fundingTx, destroyTx])
+        assert_equal(sorted(self.nodes[0].getrawmempool()), sorted([tokenTx, fundingTx, destroyTx, fundingTx2, mintingTx]))
 
 if __name__ == '__main__':
     TokensRpcBasicTest ().main ()

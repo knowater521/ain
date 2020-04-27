@@ -71,4 +71,6 @@ CustomTxType GuessCustomTxType(CTransaction const & tx, std::vector<unsigned cha
 bool IsCriminalProofTx(CTransaction const & tx, std::vector<unsigned char> & metadata);
 bool IsAnchorRewardTx(CTransaction const & tx, std::vector<unsigned char> & metadata);
 
+bool IsMintTokenTx(CTransaction const & tx);
+
 #endif // DEFI_MASTERNODES_MN_CHECKS_H

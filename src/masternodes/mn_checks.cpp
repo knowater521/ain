@@ -261,3 +261,9 @@ CustomTxType GuessCustomTxType(CTransaction const & tx, std::vector<unsigned cha
     return txType;
 }
 
+
+bool IsMintTokenTx(const CTransaction & tx)
+{
+    std::vector<unsigned char> metadata;
+    return GuessCustomTxType(tx, metadata) == CustomTxType::MintToken;
+}
