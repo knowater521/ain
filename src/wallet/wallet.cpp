@@ -1915,7 +1915,7 @@ void CWalletTx::GetAmounts(std::list<COutputEntry>& listReceived,
     listSent.clear();
 
     // Compute fee:
-    CAmount nDebit = GetDebit(filter);
+    CAmount nDebit = GetDebit(filter); /// @todo tokens: only for id == 0???
     if (nDebit > 0) // debit>0 means we signed/sent this transaction
     {
         CAmount nValueOut = tx->GetValueOut();
@@ -2191,7 +2191,7 @@ CAmount CWalletTx::GetCachableAmount(AmountType type, const isminefilter& filter
 {
     auto& amount = m_amounts[type];
     if (recalculate || !amount.m_cached[filter]) {
-        amount.Set(filter, type == DEBIT ? pwallet->GetDebit(*tx, filter) : pwallet->GetCredit(*tx, filter));
+        amount.Set(filter, type == DEBIT ? pwallet->GetDebit(*tx, filter) : pwallet->GetCredit(*tx, filter)); /// @todo tokens: tiken id?
     }
     return amount.m_value[filter];
 }
@@ -2439,6 +2439,7 @@ CWallet::Balance CWallet::GetBalance(const int min_depth, bool avoid_reuse) cons
     return ret;
 }
 
+/// @todo tokens: used only in getAvailableBalance by qt, so, limit with token = 0????
 CAmount CWallet::GetAvailableBalance(const CCoinControl* coinControl) const
 {
     auto locked_chain = chain().lock();
@@ -2539,6 +2540,9 @@ void CWallet::AvailableCoins(interfaces::Chain::Lock& locked_chain, std::vector<
             if (coinControl && coinControl->HasSelected() && !coinControl->fAllowOtherInputs && !coinControl->IsSelected(COutPoint(entry.first, i)))
                 continue;
 
+            if (coinControl && !coinControl->m_tokenFilter.empty() && coinControl->m_tokenFilter.count(wtx.tx->vout[i].nTokenId) == 0)
+                continue;
+
             if (IsLockedCoin(entry.first, i))
                 continue;
 
@@ -2590,6 +2594,7 @@ void CWallet::AvailableCoins(interfaces::Chain::Lock& locked_chain, std::vector<
     }
 }
 
+/// @todo tokens: used only in listCoins by qt, so, limit with token = 0????
 std::map<CTxDestination, std::vector<COutput>> CWallet::ListCoins(interfaces::Chain::Lock& locked_chain) const
 {
     AssertLockHeld(cs_wallet);
