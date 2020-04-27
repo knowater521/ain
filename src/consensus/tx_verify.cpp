@@ -160,6 +160,8 @@ int64_t GetTransactionSigOpCost(const CTransaction& tx, const CCoinsViewCache& i
     return nSigOps;
 }
 
+extern bool IsMintTokenTx(CTransaction const & tx);
+
 bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, const CCustomCSView * mnview, int nSpendHeight, CAmount& txfee)
 {
     // are the actual inputs available?
@@ -168,7 +170,7 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
                          strprintf("%s: inputs missing/spent", __func__));
     }
 
-    CAmount nValueIn = 0;
+    std::map<DCT_ID, CAmount> nValuesIn;
     for (unsigned int i = 0; i < tx.vin.size(); ++i) {
         const COutPoint &prevout = tx.vin[i].prevout;
         const Coin& coin = inputs.AccessCoin(prevout);
@@ -181,30 +183,55 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
         }
 
         // Check for negative or overflow input values
-        nValueIn += coin.out.nValue;
-        if (!MoneyRange(coin.out.nValue) || !MoneyRange(nValueIn)) {
+        nValuesIn[coin.out.nTokenId] += coin.out.nValue;
+        if (!MoneyRange(coin.out.nValue) || !MoneyRange(nValuesIn[coin.out.nTokenId])) {
             return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-inputvalues-outofrange");
         }
+        /// @todo tokens: later match the range with TotalSupply
 
-        if (prevout.n == 1 && !mnview->CanSpend(prevout.hash, nSpendHeight))
-        {
-            return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "collateral-locked",
+        if (prevout.n == 1 && !mnview->CanSpend(prevout.hash, nSpendHeight)) {
+            return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "collateral-locked", /// @todo "bad-txns-" prefix?
                 strprintf("tried to spend locked collateral for %s", prevout.hash.ToString())); /// @todo may be somehow place the height of unlocking?
         }
     }
 
-    const CAmount value_out = tx.GetValueOut();
-    if (nValueIn < value_out) {
+    /// @attention Keep the order of checks not to break old tests
+    TAmounts values_out = tx.GetValuesOut();
+
+    // special (old) case for 'DFI'
+    if (nValuesIn[0] < values_out[0]) {
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-in-belowout",
-            strprintf("value in (%s) < value out (%s)", FormatMoney(nValueIn), FormatMoney(value_out)));
+            strprintf("value in (%s) < value out (%s)", FormatMoney(nValuesIn[0]), FormatMoney(values_out[0])));
     }
 
     // Tally transaction fees
-    const CAmount txfee_aux = nValueIn - value_out;
+    const CAmount txfee_aux = nValuesIn[0] - values_out[0];
     if (!MoneyRange(txfee_aux)) {
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-fee-outofrange");
     }
-
     txfee = txfee_aux;
+
+    // after fee calc it is guaranteed that both values[0] exists (even if zero)
+    if (tx.nVersion < CTransaction::TOKENS_MIN_VERSION && (nValuesIn.size() > 1 || values_out.size() > 1)) {
+        return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-tokens-in-old-version-tx");
+    }
+
+    // check for tokens values
+    if (!IsMintTokenTx(tx)) { /// @todo tokens: will be checked individually
+        if (nValuesIn.size() != values_out.size()) {
+            return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-tokens-differ",
+                strprintf("token values in (%s) != values out (%s)", nValuesIn.size(), values_out.size()));
+        }
+        for (auto && it = nValuesIn.begin(); it != nValuesIn.end(); ++it) {
+            if (it->first == 0) // skip defi, check rest
+                continue;
+            if (it->second != values_out[it->first]) {
+                return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-token-in-notequal-out",
+                    strprintf("token (%d) value in (%s) != value out (%s)", it->first, FormatMoney(it->second), FormatMoney(values_out[it->first])));
+
+            }
+        }
+    }
+
     return true;
 }

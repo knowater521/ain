@@ -199,6 +199,7 @@ inline void UnserializeTransaction(TxType& tx, Stream& s);
 template<typename Stream, typename TxType>
 inline void SerializeTransaction(const TxType& tx, Stream& s);
 
+typedef std::map<uint32_t, CAmount> TAmounts;
 
 /** The basic transaction that is broadcasted on the network and contained in
  * blocks.  A transaction can contain multiple inputs and outputs.
@@ -258,13 +259,16 @@ public:
     }
 
     const uint256& GetHash() const { return hash; }
-    const uint256& GetWitnessHash() const { return m_witness_hash; };
+    const uint256& GetWitnessHash() const { return m_witness_hash; }
 
     /// @todo tokens: recalc subtotals with map?
-    // Return sum of txouts.
-    CAmount GetValueOut() const;
+    // Return sum of txouts. (extended version: for the given token)
+    CAmount GetValueOut(uint32_t nTokenId = 0) const;
     // GetValueIn() is a method on CCoinsViewCache, because
     // inputs must be known to compute value in.
+
+    // Extended version. Return map with sums of txouts by tokenId.
+    TAmounts GetValuesOut() const;
 
     /**
      * Get the total transaction size in bytes, including witness data.
