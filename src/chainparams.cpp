@@ -54,15 +54,13 @@ std::vector<CTransactionRef> CChainParams::CreateGenesisMasternodes()
     return mnTxs;
 }
 
-static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesisOutputScript, uint32_t nTime, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward, std::vector<CTransactionRef> const & extraTxs)
+static CBlock CreateGenesisBlock(const char* pszTimestamp, uint32_t nTime, uint32_t nBits, int32_t nVersion, const std::vector<CTxOut> & initdist, std::vector<CTransactionRef> const & extraTxs)
 {
     CMutableTransaction txNew;
     txNew.nVersion = 1;
     txNew.vin.resize(1);
-    txNew.vout.resize(1);
+    txNew.vout = initdist;
     txNew.vin[0].scriptSig = CScript() << 0 << 486604799 << CScriptNum(4) << std::vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
-    txNew.vout[0].nValue = genesisReward;
-    txNew.vout[0].scriptPubKey = genesisOutputScript;
 
     CBlock genesis;
     genesis.nTime           = nTime;
@@ -94,11 +92,12 @@ static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesi
  *     CTxOut(nValue=50.00000000, scriptPubKey=0x5F1DF16B2B704C8A578D0B)
  *   vMerkleTree: 4a5e1e
  */
-static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward, std::vector<CTransactionRef> const & extraTxs)
+static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nBits, int32_t nVersion, const std::vector<CTxOut> & initdist, std::vector<CTransactionRef> const & extraTxs)
 {
-    const char* pszTimestamp = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
-    const CScript genesisOutputScript = CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") << OP_CHECKSIG;
-    return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nBits, nVersion, genesisReward, extraTxs);
+    const char* pszTimestamp = "Financial Times 23/Mar/2020 The Federal Reserve has gone well past the point of ‘QE infinity’";
+//    const CScript genesisOutputScript = CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") << OP_CHECKSIG;
+//    return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nBits, nVersion, genesisReward, extraTxs);
+    return CreateGenesisBlock(pszTimestamp, nTime, nBits, nVersion, initdist, extraTxs);
 }
 
 /**
@@ -108,9 +107,9 @@ class CMainParams : public CChainParams {
 public:
     CMainParams() {
         strNetworkID = "main";
-        consensus.nSubsidyHalvingInterval = 210000;
+        consensus.nSubsidyHalvingInterval = 210000; /// @attention totally disabled for main
         consensus.baseBlockSubsidy = 200 * COIN;
-        consensus.BIP16Exception = uint256S("0x00000000000002dc756eebf4f49723ed8d30cc28a5f108eb94b1ba88ac4f9c22");
+        consensus.BIP16Exception = uint256(); //("0x00000000000002dc756eebf4f49723ed8d30cc28a5f108eb94b1ba88ac4f9c22");
         consensus.BIP34Height = 0;
         consensus.BIP34Hash = uint256();
         consensus.BIP65Height = 0; // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
@@ -119,7 +118,7 @@ public:
         consensus.pos.diffLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 //        consensus.pos.nTargetTimespan = 14 * 24 * 60 * 60; // two weeks
 //        consensus.pos.nTargetSpacing = 10 * 60; // 10 minutes
-        consensus.pos.nTargetTimespan = 12 * 60 * 60;
+        consensus.pos.nTargetTimespan = 5 * 60; // 5 min == 10 blocks
         consensus.pos.nTargetSpacing = 30; // seconds
         consensus.pos.fAllowMinDifficultyBlocks = false; // only for regtest
         consensus.pos.fNoRetargeting = false; // only for regtest
@@ -130,8 +129,8 @@ public:
 
         consensus.CSVHeight = 1; // 000000000000000004a1b34462cb8aeebd5799177f7a29cf28f2d1961716b5b5
         consensus.SegwitHeight = 0; // 0000000000000000001c8018d9cb3b742ef25114f27563e3fc4a1902167f9893
-        consensus.nRuleChangeActivationThreshold = 1368; //1916; // 95% of 2016
-        consensus.nMinerConfirmationWindow = 1440; //2016; // nTargetTimespan / nTargetSpacing
+        consensus.nRuleChangeActivationThreshold = 9; //1916; // 95% of 2016
+        consensus.nMinerConfirmationWindow = 10; //2016; // nTargetTimespan / nTargetSpacing
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
@@ -140,13 +139,13 @@ public:
         consensus.nMinimumChainWork = uint256S("0x00");
 
         // By default assume that the signatures in ancestors of this block are valid.
-        consensus.defaultAssumeValid = uint256S("0x0000000000000000000f1c54590ee18d15ec70e68c8cd4cfbadb1b4f11697eee"); //563378
+        consensus.defaultAssumeValid = uint256S("0x00"); //("0x0000000000000000000f1c54590ee18d15ec70e68c8cd4cfbadb1b4f11697eee"); //563378
 
         // Masternodes' params
-        consensus.mn.activationDelay = 1500;
-        consensus.mn.resignDelay = 300;
-        consensus.mn.creationFee = 1 * COIN;
-        consensus.mn.collateralAmount = 100 * COIN;
+        consensus.mn.activationDelay = 10;
+        consensus.mn.resignDelay = 60;
+        consensus.mn.creationFee = 10 * COIN;
+        consensus.mn.collateralAmount = 1000000 * COIN;
         consensus.mn.historyFrame = 300;
         consensus.mn.anchoringTeamSize = 5;
         consensus.mn.anchoringFrequency = 15;
@@ -159,8 +158,8 @@ public:
         consensus.spv.anchorSubsidy = 0 * COIN;
         consensus.spv.subsidyIncreasePeriod = 60;
         consensus.spv.subsidyIncreaseValue = 5 * COIN;
-        consensus.spv.wallet_xpub = "";
-        consensus.spv.anchors_address = "";
+        consensus.spv.wallet_xpub = "xpub68vVWYqkpwYT8ZxBhN2buFMTPNFzrJQV19QZmhuwQqKQZHxcXVg36GZCrwPhb7KPpivsGXxvd7g82sJXYnKNqi2ZuHJvhqcwF418YEfGMrv";
+        consensus.spv.anchors_address = "1FtZwEZKknoquUb6DyQHFZ6g6oomXJYEcb";
         consensus.spv.minConfirmations = 6;
 
         /**
@@ -172,7 +171,7 @@ public:
         pchMessageStart[1] = 0xbe;
         pchMessageStart[2] = 0xb4;
         pchMessageStart[3] = 0xd9;
-        nDefaultPort = 8323;
+        nDefaultPort = 8555;
         nPruneAfterHeight = 100000;
         m_assumed_blockchain_size = 240;
         m_assumed_chain_state_size = 3;
@@ -186,19 +185,43 @@ public:
         bech32_hrp = "df";
 
         // (!) after prefixes set
-        consensus.foundationAddress = CNoDestination();
+        consensus.foundationAddress = DecodeDestination("dZcHjYhKtEM88TtZLjp314H2xZjkztXtRc", *this);
         consensus.foundationShare = 10;
 
-        genesis = CreateGenesisBlock(1233928877, 0x1d00ffff, 1, consensus.baseBlockSubsidy, CreateGenesisMasternodes()); // old=1231006505
+        // owner base58, operator base58
+        vMasternodes.push_back({"8PuErAcazqccCVzRcc8vJ3wFaZGm4vFbLe", "8J846CKFF83Jcj5m4EReJmxiaJ6Jy1Y6Ea"});
+        vMasternodes.push_back({"8RPZm7SVUNhGN1RgGY3R92rvRkZBwETrCX", "8bzHwhaF2MaVs4owRvpWtZQVug3mKuJji2"});
+        vMasternodes.push_back({"8KRsoeCRKHUFFmAGGJbRBAgraXiUPUVuXn", "8cHaEaqRsz7fgW1eAjeroB5Bau5NfJNbtk"});
+
+        std::vector<CTxOut> initdist;
+        initdist.push_back(CTxOut(58800000 * COIN, GetScriptForDestination(DecodeDestination("8ZWWN1nX8drxJBSMG1VS9jH4ciBSvA9nxp", *this))));
+        initdist.push_back(CTxOut(44100000 * COIN, GetScriptForDestination(DecodeDestination("8aGPBahDX4oAXx9okpGRzHPS3Td1pZaLgU", *this))));
+        initdist.push_back(CTxOut(11760000 * COIN, GetScriptForDestination(DecodeDestination("8RGSkdaft9EmSXXp6b2UFojwttfJ5BY29r", *this))));
+        initdist.push_back(CTxOut(11760000 * COIN, GetScriptForDestination(DecodeDestination("8L7qGjjHRa3Agks6incPomWCfLSMPYipmU", *this))));
+        initdist.push_back(CTxOut(29400000 * COIN, GetScriptForDestination(DecodeDestination("dcZ3NXrpbNWvx1rhiGvXStM6EQtHLc44c9", *this))));
+        initdist.push_back(CTxOut(14700000 * COIN, GetScriptForDestination(DecodeDestination("dMty9CfknKEaXqJuSgYkvvyF6UB6ffrZXG", *this))));
+        initdist.push_back(CTxOut(64680000 * COIN, GetScriptForDestination(DecodeDestination("dZcY1ZNm5bkquz2J74smKqokuPoVpPvGWu", *this))));
+        initdist.push_back(CTxOut(235200000 * COIN, GetScriptForDestination(DecodeDestination("dP8dvN5pnwbsxFcfN9DyqPVZi1fVHicDd2", *this))));
+        initdist.push_back(CTxOut(117600000 * COIN, GetScriptForDestination(DecodeDestination("dMs1xeSGZbGnTJWqTwjR4mcjp2egpEXG6M", *this))));
+        {
+            CAmount sum_initdist{0};
+            for (CTxOut const & out : initdist)
+                sum_initdist += out.nValue;
+            assert(sum_initdist == 588000000 * COIN);
+        }
+
+        genesis = CreateGenesisBlock(1587883831, 0x1d00ffff, 1, initdist, CreateGenesisMasternodes()); // old=1231006505
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256S("0x00000eb73561bf4d6a32b49caf1576a11d4e84a214feaa213ee5ce052ccd5309"));
-        assert(genesis.hashMerkleRoot == uint256S("0x489dd73fab332bf0d894b4d8743ad65ad8ce33624e2fcbac091e25147b14293f"));
+
+        assert(consensus.hashGenesisBlock == uint256S("0x279b1a87aedc7b9471d4ad4e5f12967ab6259926cd097ade188dfcf22ebfe72a"));
+        assert(genesis.hashMerkleRoot == uint256S("0x03d771953b10d3506b3c3d9511e104d715dd29279be4b072ffc5218bb18adacf"));
 
         // Note that of those which support the service bits prefix, most only support a subset of
         // possible options.
         // This is fine at runtime as we'll fall back to using them as a oneshot if they don't support the
         // service bits we want, but we should get them updated to support all service bits wanted by any
         // release ASAP to avoid it where possible.
+        vSeeds.emplace_back("seed.defichain.io");
 //        vSeeds.emplace_back("seed.bitcoin.sipa.be"); // Pieter Wuille, only supports x1, x5, x9, and xd
 //        vSeeds.emplace_back("dnsseed.bluematt.me"); // Matt Corallo, only supports x9
 //        vSeeds.emplace_back("dnsseed.bitcoin.dashjr.org"); // Luke Dashjr
@@ -248,9 +271,9 @@ class CTestNetParams : public CChainParams {
 public:
     CTestNetParams() {
         strNetworkID = "test";
-        consensus.nSubsidyHalvingInterval = 210000;
+        consensus.nSubsidyHalvingInterval = 210000; /// @attention totally disabled for testnet
         consensus.baseBlockSubsidy = 200 * COIN;
-        consensus.BIP16Exception = uint256S("0x00000000dd30457c001f4095d208cc1296b0eed002427aa599874af7a432b105");
+        consensus.BIP16Exception = uint256(); //("0x00000000dd30457c001f4095d208cc1296b0eed002427aa599874af7a432b105");
         consensus.BIP34Height = 0;
         consensus.BIP34Hash = uint256();
         consensus.BIP65Height = 0; // 00000000007f6655f22f98e72ed80d8b06dc761d5da09df0fa1dc4be4f861eb6
@@ -259,7 +282,7 @@ public:
         consensus.pos.diffLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 //        consensus.pos.nTargetTimespan = 14 * 24 * 60 * 60; // two weeks
 //        consensus.pos.nTargetSpacing = 10 * 60; // 10 minutes
-        consensus.pos.nTargetTimespan = 5 * 60; // 5 min
+        consensus.pos.nTargetTimespan = 5 * 60; // 5 min == 10 blocks
         consensus.pos.nTargetSpacing = 30;
         consensus.pos.fAllowMinDifficultyBlocks = false;
         consensus.pos.fNoRetargeting = false; // only for regtest
@@ -284,9 +307,9 @@ public:
 
         // Masternodes' params
         consensus.mn.activationDelay = 10;
-        consensus.mn.resignDelay = 10;
-        consensus.mn.creationFee = 1 * COIN;
-        consensus.mn.collateralAmount = 10 * COIN;
+        consensus.mn.resignDelay = 60;
+        consensus.mn.creationFee = 10 * COIN;
+        consensus.mn.collateralAmount = 1000000 * COIN;
         consensus.mn.historyFrame = 300;
         consensus.mn.anchoringTeamSize = 5;
         consensus.mn.anchoringFrequency = 15;
@@ -296,8 +319,8 @@ public:
         consensus.token.collateralAmount = 100 * COIN;
 
         consensus.spv.creationFee = 100000; // should be > bitcoin's dust
-        consensus.spv.wallet_xpub = "tpubD8NM49wHzwMsyudhd7UtBChQBykkT1KVAHU4UDjdXt8w8ZaFzEnjxH7Uhptno2YPE616KWCitmXtH5w1RZ4y8SaNBBMr1zcjYqy1ZBkFTRp";
-        consensus.spv.anchors_address = "mtANGiuXturik8b3T7FVe6dV31v3AdEJUt";
+        consensus.spv.wallet_xpub = "tpubD9RkyYW1ixvD9vXVpYB1ka8rPZJaEQoKraYN7YnxbBxxsRYEMZgRTDRGEo1MzQd7r5KWxH8eRaQDVDaDuT4GnWgGd17xbk6An6JMdN4dwsY";
+        consensus.spv.anchors_address = "mpAkq2LyaUvKrJm2agbswrkn3QG9febnqL";
         consensus.spv.anchorSubsidy = 0 * COIN;
         consensus.spv.subsidyIncreasePeriod = 60;
         consensus.spv.subsidyIncreaseValue = 5 * COIN;
@@ -307,7 +330,7 @@ public:
         pchMessageStart[1] = 0x11;
         pchMessageStart[2] = 0x09;
         pchMessageStart[3] = 0x07;
-        nDefaultPort = 18323;
+        nDefaultPort = 18555;
         nPruneAfterHeight = 1000;
         m_assumed_blockchain_size = 30;
         m_assumed_chain_state_size = 2;
@@ -321,24 +344,30 @@ public:
         bech32_hrp = "tf";
 
         // (!) after prefixes set
-        consensus.foundationAddress = DecodeDestination("774LCfQ7TAypxBcoTqhPtrnixL53bFK1Gt", *this);
+        consensus.foundationAddress = DecodeDestination("7Q2nZCcKnxiRiHSNQtLB27RA5efxm2cE7w", *this);
         consensus.foundationShare = 10;
 
         // owner base58, operator base58
-        vMasternodes.push_back({"7M3g9CSERjLdXisE5pv2qryDbURUj9Vpi1", "7Grgx69MZJ4wDKRx1bBxLqTnU9T3quKW7n"});
-        vMasternodes.push_back({"7L29itepC13pgho1X2y7mcuf4WjkBi7x2w", "773MiaEtQK2HAwWj55gyuRiU8tSwowRTTW"});
-        vMasternodes.push_back({"75Wramp2iARchHedXcn1qRkQtMpSt9Mi3V", "7Ku81yvqbPkxpWjZpZWZZnWydXyzJozZfN"});
-        vMasternodes.push_back({"7LfqHbyh9dBQDjWB6MxcWvH2PBC5iY4wPa", "75q6ftr3QGfBT3DBu15fVfetP6duAgfhNH"});
+        vMasternodes.push_back({"7LMorkhKTDjbES6DfRxX2RiNMbeemUkxmp", "7KEu9JMKCx6aJ9wyg138W3p42rjg19DR5D"});
+        vMasternodes.push_back({"7E8Cjn9cqEwnrc3E4zN6c5xKxDSGAyiVUM", "78MWNEcAAJxihddCw1UnZD8T7fMWmUuBro"});
+        vMasternodes.push_back({"7GxxMCh7sJsvRK4GXLX5Eyh9B9EteXzuum", "7MYdTGv3bv3z65ai6y5J1NFiARg8PYu4hK"});
+        vMasternodes.push_back({"7BQZ67KKYWSmVRukgv57m4HorjbGh7NWrQ", "7GULFtS6LuJfJEikByKKg8psscg84jnfHs"});
 
-        genesis = CreateGenesisBlock(1298659543, 0x1d00ffff, 1, consensus.baseBlockSubsidy, CreateGenesisMasternodes()); // old=1296688602
+        std::vector<CTxOut> initdist;
+        initdist.push_back(CTxOut(100000000 * COIN, GetScriptForDestination(DecodeDestination("te7wgg1X9HDJvMbrP2S51uz2Gxm2LPW4Gr", *this))));
+        initdist.push_back(CTxOut(100000000 * COIN, GetScriptForDestination(DecodeDestination("tmYVkwmcv73Hth7hhHz15mx5K8mzC1hSef", *this))));
+        initdist.push_back(CTxOut(100000000 * COIN, GetScriptForDestination(DecodeDestination("tahuMwb9eX83eJhf2vXL6NPzABy3Ca8DHi", *this))));
+
+        genesis = CreateGenesisBlock(1586099762, 0x1d00ffff, 1, initdist, CreateGenesisMasternodes()); // old=1296688602
         consensus.hashGenesisBlock = genesis.GetHash();
 
-        assert(consensus.hashGenesisBlock == uint256S("0x00000a7297b606cc18480fe70e5bda5eb4690a18651697f86648395b99265571"));
-        assert(genesis.hashMerkleRoot == uint256S("0xae22df3d3b2f6a9f2e7fc8260a649a7928537445b626fa92bc977538a85ad106"));
+        assert(consensus.hashGenesisBlock == uint256S("0x034ac8c88a1a9b846750768c1ad6f295bc4d0dc4b9b418aee5c0ebd609be8f90"));
+        assert(genesis.hashMerkleRoot == uint256S("0xb71cfd828e692ca1b27e9df3a859740851047a5b5a68f659a908e8815aa35f38"));
 
         vFixedSeeds.clear();
         vSeeds.clear();
         // nodes with support for servicebits filtering should be at the top
+        vSeeds.emplace_back("testnet-seed.defichain.io");
 //        vSeeds.emplace_back("testnet-seed.bitcoin.jonasschnelli.ch");
 //        vSeeds.emplace_back("seed.tbtc.petertodd.org");
 //        vSeeds.emplace_back("seed.testnet.bitcoin.sprovoost.nl");
@@ -428,7 +457,7 @@ public:
         pchMessageStart[1] = 0xbf;
         pchMessageStart[2] = 0xb5;
         pchMessageStart[3] = 0xda;
-        nDefaultPort = 18424;
+        nDefaultPort = 19555;
         nPruneAfterHeight = 1000;
         m_assumed_blockchain_size = 0;
         m_assumed_chain_state_size = 0;
@@ -457,11 +486,15 @@ public:
         vMasternodes.push_back({"bcrt1qyrfrpadwgw7p5eh3e9h3jmu4kwlz4prx73cqny", "bcrt1qmfvw3dp3u6fdvqkdc0y3lr0e596le9cf22vtsv"});
         vMasternodes.push_back({"bcrt1qyeuu9rvq8a67j86pzvh5897afdmdjpyankp4mu", "bcrt1qurwyhta75n2g75u2u5nds9p6w9v62y8wr40d2r"});
 
-        genesis = CreateGenesisBlock(1297225381, 0x207fffff, 1, consensus.baseBlockSubsidy, CreateGenesisMasternodes()); // old=1296688602
+        genesis = CreateGenesisBlock(1579045065, 0x207fffff, 1, {
+                                         CTxOut(consensus.baseBlockSubsidy,
+                                         GetScriptForDestination(DecodeDestination("mud4VMfbBqXNpbt8ur33KHKx8pk3npSq8c", *this)) // 6th masternode owner. for initdist tests
+                                         )},
+                                     CreateGenesisMasternodes()); // old=1296688602
         consensus.hashGenesisBlock = genesis.GetHash();
 
-        assert(consensus.hashGenesisBlock == uint256S("0x00000e6e3c0fff02894aea8e46f76507d6f54dbb1b227f6911c09c2ce8117351"));
-        assert(genesis.hashMerkleRoot == uint256S("0x7889a37b3cc61704417f65ec069b9da7f862bd6926329edb889835b2793942c8"));
+        assert(consensus.hashGenesisBlock == uint256S("0x0091f00915b263d08eba2091ba70ba40cea75242b3f51ea29f4a1b8d7814cd01"));
+        assert(genesis.hashMerkleRoot == uint256S("0xc4b6f1f9a7bbb61121b949b57be05e8651e7a0c55c38eb8aaa6c6602b1abc444"));
 
         vFixedSeeds.clear(); //!< Regtest mode doesn't have any fixed seeds.
         vSeeds.clear();      //!< Regtest mode doesn't have any DNS seeds.
