@@ -186,7 +186,7 @@ build() {
     popd >/dev/null
     ./autogen.sh
     # XREF: #make-configure
-    ./configure --prefix="$(pwd)/depends/${target}" --without-gui --disable-tests
+    ./configure --prefix="$(pwd)/depends/${target}" --without-gui
     make
 }
 
@@ -397,6 +397,7 @@ git_version() {
     fi
 
     echo "> version: ${IMAGE_VERSION}"
+    echo "::set-env name=BUILD_VERSION::${IMAGE_VERSION}" # GitHub Actions
 }
 
 pkg_install_deps() {

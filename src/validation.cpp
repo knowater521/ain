@@ -906,6 +906,15 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
  */
 bool GetTransaction(const uint256& hash, CTransactionRef& txOut, const Consensus::Params& consensusParams, uint256& hashBlock, const CBlockIndex* const block_index)
 {
+    for (auto && genesisTx : Params().GenesisBlock().vtx) {
+        if (genesisTx->GetHash() == hash) {
+            // Return genesis tx
+            hashBlock = consensusParams.hashGenesisBlock;
+            txOut = genesisTx;
+            return true;
+        }
+    }
+
     LOCK(cs_main);
 
     if (!block_index) {
@@ -991,6 +1000,12 @@ bool ReadBlockFromDisk(CBlock& block, const FlatFilePos& pos, const Consensus::P
 
 bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus::Params& consensusParams)
 {
+    if (pindex->GetBlockHash() == consensusParams.hashGenesisBlock) {
+        // Return genesis block
+        block = Params().GenesisBlock();
+        return true;
+    }
+
     FlatFilePos blockPos;
     {
         LOCK(cs_main);
@@ -1053,6 +1068,9 @@ bool ReadRawBlockFromDisk(std::vector<uint8_t>& block, const CBlockIndex* pindex
 
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
 {
+    if (Params().NetworkIDString() != CBaseChainParams::REGTEST)
+        return consensusParams.baseBlockSubsidy;
+
     int halvings = nHeight / consensusParams.nSubsidyHalvingInterval;
     // Force block reward to zero when right shift is undefined.
     if (halvings >= 64)
@@ -1844,14 +1862,14 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
                              ", current block = " + std::to_string(pindex->nHeight) + ". Please restart with -reindex to recover.");
     }
 
-    // Special case for the genesis block, skipping connection of its transactions
-    // (its coinbase is unspendable)
+    // Special case for the genesis block
     if (block.GetHash() == chainparams.GetConsensus().hashGenesisBlock) {
         if (!fJustCheck) {
             view.SetBestBlock(pindex->GetBlockHash());
             // init view|db with genesis here
-            for (size_t i = 1; i < block.vtx.size(); ++i) {
+            for (size_t i = 0; i < block.vtx.size(); ++i) {
                 CheckCustomTx(mnview, view, *block.vtx[i], chainparams.GetConsensus(), pindex->nHeight, i, fJustCheck);
+                AddCoins(view, *block.vtx[i], 0);
             }
         }
         return true;
@@ -2337,13 +2355,13 @@ bool CChainState::FlushStateToDisk(
             // twice (once in the log, and once in the tables). This is already
             // an overestimation, as most will delete an existing entry or
             // overwrite one. Still, use a conservative safety factor of 2.
-            /// @todo check free space for penhancedview flushing
+            /// @todo check free space for pcustomcsview flushing
             if (!CheckDiskSpace(GetDataDir(), 48 * 2 * 2 * CoinsTip().GetCacheSize())) {
                 return AbortNode(state, "Disk space is too low!", _("Error: Disk space is too low!").translated, CClientUIInterface::MSG_NOPREFIX);
             }
             // Flush the chainstate (which may refer to block index entries).
-            /// @todo may be integrate penhancedview into ChainState?
-            /// @attention it is critical to flush 'penhancedview', then 'penhancedDB'!!!
+            /// @todo may be integrate pcustomcsview into ChainState?
+            /// @attention it is critical to flush 'pcustomcsview', then 'pcustomcsDB'!!!
             if (!CoinsTip().Flush() || !pcustomcsview->Flush() || !pcustomcsDB->Flush())
                 return AbortNode(state, "Failed to write to coin or masternodes database");
             nLastFlush = nNow;
