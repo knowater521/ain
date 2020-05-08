@@ -282,7 +282,11 @@ public:
         LOCK(cs_main);
         return pcustomcsview->ExistMasternode(nodeId);
     }
-
+    std::unique_ptr<CToken> existTokenGuessId(const std::string & str, uint32_t & id) const override
+    {
+        LOCK(cs_main);
+        return pcustomcsview->ExistTokenGuessId(str, id);
+    }
     double guessVerificationProgress(const uint256& block_hash) override
     {
         LOCK(cs_main);
