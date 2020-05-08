@@ -50,7 +50,6 @@ bool HasAuth(CTransaction const & tx, CKeyID const & auth)
                return true;
         }
         else {
-            /// @todo EXTEND IT TO SUPPORT WITNESS!!
             auto test = CPubKey(input.scriptWitness.stack.back());
             if (test.GetID() == auth)
                return true;
@@ -77,7 +76,7 @@ bool CheckCustomTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTrans
 
     if (tx.vout.size() > 0)
     {
-        // Check if it is masternode tx with metadata
+        // Check if it is custom tx with metadata
         std::vector<unsigned char> metadata;
         CustomTxType guess = GuessCustomTxType(tx, metadata);
         switch (guess)

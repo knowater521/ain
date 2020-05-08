@@ -6,6 +6,7 @@
 
 #include <consensus/consensus.h>
 #include <masternodes/masternodes.h>
+#include <masternodes/mn_checks.h>
 #include <primitives/transaction.h>
 #include <script/interpreter.h>
 #include <consensus/validation.h>
@@ -160,8 +161,6 @@ int64_t GetTransactionSigOpCost(const CTransaction& tx, const CCoinsViewCache& i
     return nSigOps;
 }
 
-extern bool IsMintTokenTx(CTransaction const & tx);
-
 bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, const CCustomCSView * mnview, int nSpendHeight, CAmount& txfee)
 {
     // are the actual inputs available?
@@ -217,21 +216,44 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
     }
 
     // check for tokens values
-    if (!IsMintTokenTx(tx)) { /// @todo tokens: will be checked individually
-        if (nValuesIn.size() != values_out.size()) {
-            return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-tokens-differ",
-                strprintf("token values in (%s) != values out (%s)", nValuesIn.size(), values_out.size()));
+    bool isMintTokenTx = IsMintTokenTx(tx);
+    if (!isMintTokenTx && nValuesIn.size() != values_out.size()) {
+        return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-tokens-differ",
+            strprintf("token values in (%s) != values out (%s)", nValuesIn.size(), values_out.size()));
+    }
+    if (isMintTokenTx && nValuesIn.size() != 1) { // it is definitely type zero
+        return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-inputs",
+            strprintf("token inputs for MintToken tx should be Defi coins only"));
+    }
+
+    for (auto && it = values_out.begin(); it != values_out.end(); ++it) {
+        DCT_ID tokenId = it->first;
+        if (tokenId == 0) // skip defi, check rest
+            continue;
+
+        if (isMintTokenTx) {
+            if (tokenId < CTokensView::DCT_ID_START) {
+                return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-id-stable",
+                    strprintf("token id (%d) is StableCoin and can't be minted", tokenId));
+            }
+            auto token = mnview->ExistToken(tokenId);
+            if (!token) {
+                return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-id-absent",
+                    strprintf("token id (%d) does not exist", tokenId));
+            }
+            CTokenImplementation const & tokenImpl = static_cast<CTokenImplementation const &>(*token);
+            if (!HasAuth(tx, inputs, tokenImpl.creationTx)) {
+                return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-auth",
+                    strprintf("missed auth inputs for token id (%d), are you an owner of that token?", tokenId));
+            }
         }
-        for (auto && it = nValuesIn.begin(); it != nValuesIn.end(); ++it) {
-            if (it->first == 0) // skip defi, check rest
-                continue;
-            if (it->second != values_out[it->first]) {
-                return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-token-in-notequal-out",
-                    strprintf("token (%d) value in (%s) != value out (%s)", it->first, FormatMoney(it->second), FormatMoney(values_out[it->first])));
+        else {
+            if (it->second < nValuesIn[tokenId]) {
+                return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-in-belowout",
+                    strprintf("token (%d) value in (%s) < value out (%s)", tokenId, FormatMoney(nValuesIn[tokenId]), FormatMoney(it->second)));
 
             }
         }
     }
-
     return true;
 }

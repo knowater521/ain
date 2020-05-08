@@ -14,6 +14,7 @@ extern bool IsAnchorRewardTx(CTransaction const & tx, std::vector<unsigned char>
 
 bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fCheckDuplicateInputs)
 {
+    /// @note we don't check minted token's outputs nor auth here!
     // Basic checks that don't depend on any context
     if (tx.vin.empty())
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-vin-empty");
