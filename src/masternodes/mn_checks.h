@@ -55,6 +55,9 @@ inline void Unserialize(Stream& s, CustomTxType & txType) {
     txType = CustomTxCodeToType(ch);
 }
 
+bool HasAuth(CTransaction const & tx, CKeyID const & auth);
+bool HasAuth(CTransaction const & tx, const CCoinsViewCache &coins, uint256 const & tokenTx);
+
 bool CheckCustomTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, const Consensus::Params& consensusParams, int height, int txn, bool isCheck = true);
 //! Deep check (and write)
 bool CheckCreateMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck);

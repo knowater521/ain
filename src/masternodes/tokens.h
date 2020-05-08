@@ -16,6 +16,8 @@ class CTransaction;
 
 using DCT_ID = uint32_t;    // VARINT ?
 
+std::string trim_ws(std::string const & str);
+
 class CToken
 {
 public:
@@ -130,6 +132,7 @@ public:
     boost::optional<std::pair<DCT_ID, std::unique_ptr<CToken>>> ExistToken(std::string const & symbol) const;
     // the only possible type of token (with creationTx) is CTokenImpl
     boost::optional<std::pair<DCT_ID, CTokenImpl>> ExistTokenByCreationTx(uint256 const & txid) const;
+    std::unique_ptr<CToken> ExistTokenGuessId(const std::string & str, DCT_ID & id) const;
 
     void ForEachToken(std::function<bool(DCT_ID const & id, CToken const & token)> callback);
 
