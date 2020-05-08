@@ -44,6 +44,10 @@ BOOST_FIXTURE_TEST_SUITE(rpc_tests, TestingSetup)
 
 BOOST_AUTO_TEST_CASE(rpc_rawparams)
 {
+    InitInterfaces interfaces;
+    interfaces.chain = interfaces::MakeChain();
+    g_rpc_interfaces = &interfaces;
+
     // Test raw transaction API argument handling
     UniValue r;
 

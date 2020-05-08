@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <masternodes/tokens.h>
+#include <core_io.h>
 #include <primitives/transaction.h>
 
 /// @attention make sure that it does not overlap with those in masternodes.cpp !!!
@@ -14,6 +15,18 @@ const unsigned char CTokensView::LastDctId   ::prefix = 'L';
 const DCT_ID CTokensView::DCT_ID_START = 128;
 
 extern const std::string CURRENCY_UNIT;
+
+std::string trim_ws(std::string const & str)
+{
+    std::string const ws = " \n\r\t";
+    size_t first = str.find_first_not_of(ws);
+    if (std::string::npos == first)
+    {
+        return str;
+    }
+    size_t last = str.find_last_not_of(ws);
+    return str.substr(first, (last - first + 1));
+}
 
 CTokenImplementation::CTokenImplementation(const CTransaction & tx, int heightIn, const std::vector<unsigned char> & metadata)
 {
@@ -122,6 +135,35 @@ boost::optional<std::pair<DCT_ID, CTokensView::CTokenImpl> > CTokensView::ExistT
         auto tokenImpl = ReadBy<ID, CTokenImpl>(varint);
         if (tokenImpl)
             return { std::make_pair(id, std::move(*tokenImpl))};
+    }
+    return {};
+}
+
+std::unique_ptr<CToken> CTokensView::ExistTokenGuessId(const std::string & str, DCT_ID & id) const
+{
+    std::string const key = trim_ws(str);
+
+    if (key.empty()) {
+        id = 0;
+        return ExistToken(0);
+    }
+    if (ParseUInt32(key, &id))
+        return ExistToken(id);
+
+    uint256 tx;
+    if (ParseHashStr(key, tx)) {
+        auto pair = ExistTokenByCreationTx(tx);
+        if (pair) {
+            id = pair->first;
+            return MakeUnique<CToken>(pair->second);
+        }
+    }
+    else {
+        auto pair = ExistToken(key);
+        if (pair) {
+            id = pair->first;
+            return std::move(pair->second);
+        }
     }
     return {};
 }

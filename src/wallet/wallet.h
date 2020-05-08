@@ -335,6 +335,7 @@ struct CRecipient
 {
     CScript scriptPubKey;
     CAmount nAmount;
+    uint32_t nTokenId;
     bool fSubtractFeeFromAmount;
 };
 
@@ -1099,6 +1100,7 @@ public:
                            std::string& strFailReason, const CCoinControl& coin_control, bool sign = true);
     bool CommitTransaction(CTransactionRef tx, mapValue_t mapValue, std::vector<std::pair<std::string, std::string>> orderForm, CValidationState& state);
 
+    /// @todo tokens: refactor to unify with new general CreateTransaction()
     bool CreateMintTokenTransaction(interfaces::Chain::Lock& locked_chain, CMutableTransaction &origTx, CTransactionRef& tx, CAmount& nFeeRet, int& nChangePosInOut,
                            std::string& strFailReason, const CCoinControl& coin_control, bool sign = true);
 
