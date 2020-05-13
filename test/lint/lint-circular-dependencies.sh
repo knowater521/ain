@@ -37,7 +37,7 @@ EXPECTED_CIRCULAR_DEPENDENCIES=(
     "chainparams -> masternodes/mn_checks -> txmempool -> validation -> pos -> chainparams"
     "chainparams -> masternodes/mn_checks -> txmempool -> validation -> wallet/wallet -> chainparams"
     "consensus/tx_verify -> masternodes/masternodes -> validation -> consensus/tx_verify"
-    "consensus/tx_verify -> masternodes/masternodes -> masternodes/mn_checks -> txmempool -> consensus/tx_verify"
+    "consensus/tx_verify -> masternodes/mn_checks -> txmempool -> consensus/tx_verify"
     "masternodes/criminals -> masternodes/masternodes -> masternodes/criminals"
     "masternodes/criminals -> masternodes/masternodes -> validation -> masternodes/criminals"
     "masternodes/masternodes -> masternodes/mn_checks -> masternodes/masternodes"

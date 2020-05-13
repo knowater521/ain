@@ -108,14 +108,14 @@ class TokensRpcBasicTest (DefiTestFramework):
         fundingTx2 = self.nodes[0].sendtoaddress(collateral0, 1)
         self.nodes[0].generate(1)
 
-        mintingTx = self.nodes[0].minttokens([], "GOLD", { self.nodes[0].getnewaddress("", "legacy"): 100 })
+        self.nodes[0].minttokens([], "GOLD", { self.nodes[0].getnewaddress("", "legacy"): 100 })
         self.nodes[0].generate(1)
 
         # input ("pause")
         print (self.nodes[0].listunspent(0, 9999999, [], True, {"tokenId": 128}))
         # input ("pause")
         tokenAddr = self.nodes[0].getnewaddress("", "legacy")
-        sendTokenTx = self.nodes[0].sendtoaddress("GOLD" + "@" + tokenAddr, 10)
+        self.nodes[0].sendtoaddress("GOLD" + "@" + tokenAddr, 10)
         self.nodes[0].generate(1)
         utxos = self.nodes[0].listunspent(0, 9999999, [], True, {"tokenId": 128})
         if (utxos[0]['amount'] == 90):
