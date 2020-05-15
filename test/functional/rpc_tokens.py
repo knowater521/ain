@@ -35,7 +35,7 @@ class TokensRpcBasicTest (DefiTestFramework):
 
         # Fail to create: Insufficient funds (not matured coins)
         try:
-            tokenTx = self.nodes[0].createtoken([], {
+            createTokenTx = self.nodes[0].createtoken([], {
                 "symbol": "GOLD",
                 "name": "shiny gold",
                 "collateralAddress": collateral0
@@ -46,14 +46,14 @@ class TokensRpcBasicTest (DefiTestFramework):
 
         # Create token 'GOLD' (128)
         self.nodes[0].generate(1)
-        tokenTx = self.nodes[0].createtoken([], {
+        createTokenTx = self.nodes[0].createtoken([], {
             "symbol": "GOLD",
             "name": "shiny gold",
             "collateralAddress": collateral0
         })
 
         # Create and sign (only) collateral spending tx
-        spendTx = self.nodes[0].createrawtransaction([{'txid':tokenTx, 'vout':1}],[{collateral0:9.999}])
+        spendTx = self.nodes[0].createrawtransaction([{'txid':createTokenTx, 'vout':1}],[{collateral0:9.999}])
         signedTx = self.nodes[0].signrawtransactionwithwallet(spendTx)
         assert_equal(signedTx['complete'], True)
 
@@ -69,7 +69,7 @@ class TokensRpcBasicTest (DefiTestFramework):
         tokens = self.nodes[0].listtokens()
         assert_equal(len(tokens), 2)
         assert_equal(tokens['128']["symbol"], "GOLD")
-        assert_equal(tokens['128']["creationTx"], tokenTx)
+        assert_equal(tokens['128']["creationTx"], createTokenTx)
 
         # Check 'listtokens' output
         t0 = self.nodes[0].listtokens(0)
@@ -80,7 +80,7 @@ class TokensRpcBasicTest (DefiTestFramework):
         assert_equal(len(t128), 1)
         assert_equal(t128['128']['symbol'], "GOLD")
         assert_equal(self.nodes[0].listtokens("GOLD"), t128)
-        assert_equal(self.nodes[0].listtokens(tokenTx), t128)
+        assert_equal(self.nodes[0].listtokens(createTokenTx), t128)
 
 
         self.sync_blocks(self.nodes[0:2])
@@ -108,14 +108,14 @@ class TokensRpcBasicTest (DefiTestFramework):
         fundingTx2 = self.nodes[0].sendtoaddress(collateral0, 1)
         self.nodes[0].generate(1)
 
-        self.nodes[0].minttokens([], "GOLD", { self.nodes[0].getnewaddress("", "legacy"): 100 })
+        mintingTx = self.nodes[0].minttokens([], "GOLD", { self.nodes[0].getnewaddress("", "legacy"): 100 })
         self.nodes[0].generate(1)
 
         # input ("pause")
         print (self.nodes[0].listunspent(0, 9999999, [], True, {"tokenId": 128}))
         # input ("pause")
         tokenAddr = self.nodes[0].getnewaddress("", "legacy")
-        self.nodes[0].sendtoaddress("GOLD" + "@" + tokenAddr, 10)
+        sendcreateTokenTx = self.nodes[0].sendtoaddress("GOLD" + "@" + tokenAddr, 10)
         self.nodes[0].generate(1)
         utxos = self.nodes[0].listunspent(0, 9999999, [], True, {"tokenId": 128})
         if (utxos[0]['amount'] == 90):
@@ -149,7 +149,7 @@ class TokensRpcBasicTest (DefiTestFramework):
         connect_nodes_bi(self.nodes, 0, 1)
         self.sync_blocks(self.nodes[0:2])
 
-        assert_equal(sorted(self.nodes[0].getrawmempool()), sorted([fundingTx, destroyTx, fundingTx2]))
+        assert_equal(sorted(self.nodes[0].getrawmempool()), sorted([fundingTx, destroyTx, fundingTx2, mintingTx, sendcreateTokenTx]))
         assert_equal(self.nodes[0].listtokens()['128']['destructionHeight'], -1)
         assert_equal(self.nodes[0].listtokens()['128']['destructionTx'], '0000000000000000000000000000000000000000000000000000000000000000')
 
@@ -160,7 +160,7 @@ class TokensRpcBasicTest (DefiTestFramework):
         connect_nodes_bi(self.nodes, 0, 2)
         self.sync_blocks(self.nodes[0:3])
         assert_equal(len(self.nodes[0].listtokens()), 1)
-        assert_equal(sorted(self.nodes[0].getrawmempool()), sorted([tokenTx, fundingTx, destroyTx, fundingTx2]))
+        assert_equal(sorted(self.nodes[0].getrawmempool()), sorted([createTokenTx, fundingTx, destroyTx, fundingTx2]))
 
 if __name__ == '__main__':
     TokensRpcBasicTest ().main ()
