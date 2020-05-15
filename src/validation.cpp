@@ -375,13 +375,18 @@ static void UpdateMempoolForReorg(DisconnectedBlockTransactions& disconnectpool,
     // Iterate disconnectpool in reverse, so that we add transactions
     // back to the mempool starting with the earliest transaction that had
     // been previously seen in a block.
+    bool possibleMintTokenAffected{false};
     auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
     while (it != disconnectpool.queuedTx.get<insertion_order>().rend()) {
+        TBytes dummy;
+        if (GuessCustomTxType(**it, dummy) == CustomTxType::CreateToken) // regardless of fAddToMempool and prooven CreateTokenTx
+            possibleMintTokenAffected = true;
+
         // ignore validation errors in resurrected transactions
         CValidationState stateDummy;
         if (!fAddToMempool || (*it)->IsCoinBase() ||
             !AcceptToMemoryPool(mempool, stateDummy, *it, nullptr /* pfMissingInputs */,
-                                nullptr /* plTxnReplaced */, true /* bypass_limits */, 0 /* nAbsurdFee */) || IsMintTokenTx(**it)) { /// @todo tokens: reorg/check/accept minting txs
+                                nullptr /* plTxnReplaced */, true /* bypass_limits */, 0 /* nAbsurdFee */)) {
             // If the transaction doesn't make it in to the mempool, remove any
             // transactions that depend on it (which would now be orphans).
             mempool.removeRecursive(**it, MemPoolRemovalReason::REORG);
@@ -391,6 +396,32 @@ static void UpdateMempoolForReorg(DisconnectedBlockTransactions& disconnectpool,
         ++it;
     }
     disconnectpool.queuedTx.clear();
+
+    // remove affected MintTokenTxs
+    /// @todo tokens: refactor to mempool method?
+    if (possibleMintTokenAffected) {
+        std::vector<uint256> mintTokensToRemove; // not sure about tx refs safety while recursive deletion, so hashes
+        for (const CTxMemPoolEntry& e : mempool.mapTx) {
+            auto tx = e.GetTx();
+            if (IsMintTokenTx(tx)) {
+                auto values = tx.GetValuesOut();
+                for (auto const & pair : values) {
+                    if (pair.first == 0)
+                        continue;
+                    // remove only if token does not exist any more
+                    if (!pcustomcsview->ExistToken(pair.first)) {
+                        mintTokensToRemove.push_back(tx.GetHash());
+                    }
+                }
+            }
+        }
+        for (uint256 const & hash : mintTokensToRemove) {
+            CTransactionRef tx = mempool.get(hash);
+            if (tx)
+                mempool.removeRecursive(*tx, MemPoolRemovalReason::REORG);
+        }
+    }
+
     // AcceptToMemoryPool/addUnchecked all assume that new mempool entries have
     // no in-mempool children, which is generally not true when adding
     // previously-confirmed transactions back to the mempool.
