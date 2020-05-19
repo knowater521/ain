@@ -14,8 +14,6 @@
 
 class CTransaction;
 
-using DCT_ID = uint32_t;    // VARINT ?
-
 std::string trim_ws(std::string const & str);
 
 class CToken

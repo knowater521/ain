@@ -176,6 +176,19 @@ static std::string LabelFromValue(const UniValue& value)
     return label;
 }
 
+static UniValue TokensToJSON(const TAmounts & amounts, bool with_tokens)
+{
+    if (!with_tokens) {
+        return ValueFromAmount(amounts.find(0) == amounts.end() ? 0 : amounts.at(0));
+    }
+
+    UniValue result(UniValue::VOBJ);
+    for (auto pair : amounts) {
+        result.pushKV(std::to_string(pair.first), ValueFromAmount(pair.second));
+    }
+    return result;
+}
+
 static UniValue getnewaddress(const JSONRPCRequest& request)
 {
     std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
@@ -318,13 +331,13 @@ static UniValue setlabel(const JSONRPCRequest& request)
 
 static CTransactionRef SendMoney(interfaces::Chain::Lock& locked_chain, CWallet * const pwallet, const CTxDestination &address, CAmount nValue, uint32_t tokenId, bool fSubtractFeeFromAmount, const CCoinControl& coin_control, mapValue_t mapValue)
 {
-    CAmount curBalance = pwallet->GetBalance(0, coin_control.m_avoid_address_reuse).m_mine_trusted;
+    TAmounts curBalance = pwallet->GetBalance(0, coin_control.m_avoid_address_reuse).m_mine_trusted;
 
     // Check amount
     if (nValue <= 0)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
 
-    if (nValue > curBalance) /// @todo tokens: check token balances
+    if (nValue > curBalance[tokenId])
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
 
     // Parse Defi address
@@ -335,11 +348,11 @@ static CTransactionRef SendMoney(interfaces::Chain::Lock& locked_chain, CWallet 
     std::string strError;
     std::vector<CRecipient> vecSend;
     int nChangePosRet = -1;
-    CRecipient recipient = {scriptPubKey, nValue, tokenId, fSubtractFeeFromAmount};
+    CRecipient recipient = {scriptPubKey, nValue, tokenId, tokenId == 0 ? fSubtractFeeFromAmount : false }; // turn off `fSubtractFeeFromAmount` for tokens
     vecSend.push_back(recipient);
     CTransactionRef tx;
     if (!pwallet->CreateTransaction(locked_chain, vecSend, tx, nFeeRequired, nChangePosRet, strError, coin_control)) {
-        if (!fSubtractFeeFromAmount && nValue + nFeeRequired > curBalance)
+        if (!fSubtractFeeFromAmount && (tokenId == 0 ? nValue : 0) + nFeeRequired > curBalance[0])
             strError = strprintf("Error: This transaction requires a transaction fee of at least %s", FormatMoney(nFeeRequired));
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
     }
@@ -717,6 +730,17 @@ static UniValue getreceivedbylabel(const JSONRPCRequest& request)
     return ValueFromAmount(nAmount);
 }
 
+inline void Increment(TAmounts & accum, TAmounts const & amounts) {
+    for (auto const & pair : amounts) {
+        accum[pair.first] += pair.second;
+    }
+}
+
+inline void Decrement(TAmounts & accum, TAmounts const & amounts) {
+    for (auto const & pair : amounts) {
+        accum[pair.first] -= pair.second;
+    }
+}
 
 static UniValue getbalance(const JSONRPCRequest& request)
 {
@@ -736,9 +760,12 @@ static UniValue getbalance(const JSONRPCRequest& request)
                     {"minconf", RPCArg::Type::NUM, /* default */ "0", "Only include transactions confirmed at least this many times."},
                     {"include_watchonly", RPCArg::Type::BOOL, /* default */ "true for watch-only wallets, otherwise false", "Also include balance in watch-only addresses (see 'importaddress')"},
                     {"avoid_reuse", RPCArg::Type::BOOL, /* default */ "true", "(only available if avoid_reuse wallet flag is set) Do not include balance in dirty outputs; addresses are considered dirty if they have previously been used in a transaction."},
+                    {"with_tokens", RPCArg::Type::BOOL, /* default */ "false", "Include tokens balances; Default is 'false' for backward compatibility."},
                 },
                 RPCResult{
-            "amount              (numeric) The total amount in " + CURRENCY_UNIT + " received for this wallet.\n"
+            "amount                 (numeric) The total amount in " + CURRENCY_UNIT + " received for this wallet.\n"
+            "   or\n"
+            "{tokenId: amount,...}  (list) If used 'with_tokens' option\n"
                 },
                 RPCExamples{
             "\nThe total amount in the wallet with 1 or more confirmations\n"
@@ -768,12 +795,14 @@ static UniValue getbalance(const JSONRPCRequest& request)
     }
 
     bool include_watchonly = ParseIncludeWatchonly(request.params[2], *pwallet);
-
     bool avoid_reuse = GetAvoidReuseFlag(pwallet, request.params[3]);
+    bool with_tokens = request.params[4].isNull() ? false : request.params[4].get_bool();
 
-    const auto bal = pwallet->GetBalance(min_depth, avoid_reuse);
-
-    return ValueFromAmount(bal.m_mine_trusted + (include_watchonly ? bal.m_watchonly_trusted : 0));
+    auto bal = pwallet->GetBalance(min_depth, avoid_reuse);
+    if (include_watchonly) {
+        Increment(bal.m_mine_trusted, bal.m_watchonly_trusted); // `mine` and `watchonly` may not intersect at all by token_ids; m_mine_trusted is "spoiled" after that but keys merged
+    }
+    return TokensToJSON(bal.m_mine_trusted, with_tokens); // possible updated by "watchonly"
 }
 
 static UniValue getunconfirmedbalance(const JSONRPCRequest &request)
@@ -787,7 +816,9 @@ static UniValue getunconfirmedbalance(const JSONRPCRequest &request)
 
             RPCHelpMan{"getunconfirmedbalance",
                 "DEPRECATED\nIdentical to getbalances().mine.untrusted_pending\n",
-                {},
+                {
+                    {"with_tokens", RPCArg::Type::BOOL, /* default */ "false", "Include tokens balances; Default is 'false' for backward compatibility."},
+                },
                 RPCResults{},
                 RPCExamples{""},
             }.Check(request);
@@ -799,7 +830,9 @@ static UniValue getunconfirmedbalance(const JSONRPCRequest &request)
     auto locked_chain = pwallet->chain().lock();
     LOCK(pwallet->cs_wallet);
 
-    return ValueFromAmount(pwallet->GetBalance().m_mine_untrusted_pending);
+    bool with_tokens = request.params[0].isNull() ? false : request.params[0].get_bool();
+
+    return TokensToJSON(pwallet->GetBalance().m_mine_untrusted_pending, with_tokens);
 }
 
 
@@ -1718,8 +1751,8 @@ static UniValue gettransaction(const JSONRPCRequest& request)
     const CWalletTx& wtx = it->second;
 
     /// @todo tokens: id == 0??
-    CAmount nCredit = wtx.GetCredit(*locked_chain, filter);
-    CAmount nDebit = wtx.GetDebit(filter);
+    CAmount nCredit = wtx.GetCredit(*locked_chain, filter)[0]; /// @todo tokens: extend?
+    CAmount nDebit = wtx.GetDebit(filter)[0];                  /// @todo tokens: extend?
     CAmount nNet = nCredit - nDebit;
     CAmount nFee = (wtx.IsFromMe(filter) ? wtx.tx->GetValueOut() - nDebit : 0);
 
@@ -2339,7 +2372,9 @@ static UniValue getbalances(const JSONRPCRequest& request)
     RPCHelpMan{
         "getbalances",
         "Returns an object with all balances in " + CURRENCY_UNIT + ".\n",
-        {},
+        {
+            {"with_tokens", RPCArg::Type::BOOL, /* default */ "false", "Include tokens balances; Default is 'false' for backward compatibility."},
+        },
         RPCResult{
             "{\n"
             "    \"mine\": {                        (object) balances from outputs that the wallet can sign\n"
@@ -2366,27 +2401,33 @@ static UniValue getbalances(const JSONRPCRequest& request)
     auto locked_chain = wallet.chain().lock();
     LOCK(wallet.cs_wallet);
 
+    bool with_tokens = request.params[0].isNull() ? false : request.params[0].get_bool();
+
     UniValue obj(UniValue::VOBJ);
 
     const auto bal = wallet.GetBalance();
     UniValue balances{UniValue::VOBJ};
     {
         UniValue balances_mine{UniValue::VOBJ};
-        balances_mine.pushKV("trusted", ValueFromAmount(bal.m_mine_trusted));
-        balances_mine.pushKV("untrusted_pending", ValueFromAmount(bal.m_mine_untrusted_pending));
+        balances_mine.pushKV("trusted", TokensToJSON(bal.m_mine_trusted, with_tokens));
+        balances_mine.pushKV("untrusted_pending", TokensToJSON(bal.m_mine_untrusted_pending, with_tokens));
         balances_mine.pushKV("immature", ValueFromAmount(bal.m_mine_immature));
         if (wallet.IsWalletFlagSet(WALLET_FLAG_AVOID_REUSE)) {
             // If the AVOID_REUSE flag is set, bal has been set to just the un-reused address balance. Get
             // the total balance, and then subtract bal to get the reused address balance.
-            const auto full_bal = wallet.GetBalance(0, false);
-            balances_mine.pushKV("used", ValueFromAmount(full_bal.m_mine_trusted + full_bal.m_mine_untrusted_pending - bal.m_mine_trusted - bal.m_mine_untrusted_pending));
+            auto full_bal = wallet.GetBalance(0, false);
+            Increment(full_bal.m_mine_trusted, full_bal.m_mine_untrusted_pending);
+            Decrement(full_bal.m_mine_trusted, bal.m_mine_trusted);
+            Decrement(full_bal.m_mine_trusted, bal.m_mine_untrusted_pending);
+            balances_mine.pushKV("used", TokensToJSON(full_bal.m_mine_trusted, with_tokens));
+//                balances_mine.pushKV("used", ValueFromAmount(full_bal.m_mine_trusted[0] + full_bal.m_mine_untrusted_pending[0] - bal.m_mine_trusted[0] - bal.m_mine_untrusted_pending[0]));
         }
         balances.pushKV("mine", balances_mine);
     }
     if (wallet.HaveWatchOnly()) {
         UniValue balances_watchonly{UniValue::VOBJ};
-        balances_watchonly.pushKV("trusted", ValueFromAmount(bal.m_watchonly_trusted));
-        balances_watchonly.pushKV("untrusted_pending", ValueFromAmount(bal.m_watchonly_untrusted_pending));
+        balances_watchonly.pushKV("trusted", TokensToJSON(bal.m_watchonly_trusted, with_tokens));
+        balances_watchonly.pushKV("untrusted_pending", TokensToJSON(bal.m_watchonly_untrusted_pending, with_tokens));
         balances_watchonly.pushKV("immature", ValueFromAmount(bal.m_watchonly_immature));
         balances.pushKV("watchonly", balances_watchonly);
     }
@@ -2404,7 +2445,9 @@ static UniValue getwalletinfo(const JSONRPCRequest& request)
 
     RPCHelpMan{"getwalletinfo",
                 "Returns an object containing various wallet state info.\n",
-                {},
+                {
+                    {"with_tokens", RPCArg::Type::BOOL, /* default */ "false", "Include tokens balances; Default is 'false' for backward compatibility."},
+                },
                 RPCResult{
             "{\n"
             "  \"walletname\": xxxxx,               (string) the wallet name\n"
@@ -2441,14 +2484,16 @@ static UniValue getwalletinfo(const JSONRPCRequest& request)
     auto locked_chain = pwallet->chain().lock();
     LOCK(pwallet->cs_wallet);
 
+    bool with_tokens = request.params[0].isNull() ? false : request.params[0].get_bool();
+
     UniValue obj(UniValue::VOBJ);
 
     size_t kpExternalSize = pwallet->KeypoolCountExternalKeys();
     const auto bal = pwallet->GetBalance();
     obj.pushKV("walletname", pwallet->GetName());
     obj.pushKV("walletversion", pwallet->GetVersion());
-    obj.pushKV("balance", ValueFromAmount(bal.m_mine_trusted));
-    obj.pushKV("unconfirmed_balance", ValueFromAmount(bal.m_mine_untrusted_pending));
+    obj.pushKV("balance", TokensToJSON(bal.m_mine_trusted, with_tokens));
+    obj.pushKV("unconfirmed_balance", TokensToJSON(bal.m_mine_untrusted_pending, with_tokens));
     obj.pushKV("immature_balance", ValueFromAmount(bal.m_mine_immature));
     obj.pushKV("txcount",       (int)pwallet->mapWallet.size());
     obj.pushKV("keypoololdest", pwallet->GetOldestKeyPoolTime());
@@ -4184,15 +4229,15 @@ static const CRPCCommand commands[] =
     { "wallet",             "encryptwallet",                    &encryptwallet,                 {"passphrase"} },
     { "wallet",             "getaddressesbylabel",              &getaddressesbylabel,           {"label"} },
     { "wallet",             "getaddressinfo",                   &getaddressinfo,                {"address"} },
-    { "wallet",             "getbalance",                       &getbalance,                    {"dummy","minconf","include_watchonly","avoid_reuse"} },
+    { "wallet",             "getbalance",                       &getbalance,                    {"dummy","minconf","include_watchonly","avoid_reuse", "with_tokens"} },
     { "wallet",             "getnewaddress",                    &getnewaddress,                 {"label","address_type"} },
     { "wallet",             "getrawchangeaddress",              &getrawchangeaddress,           {"address_type"} },
     { "wallet",             "getreceivedbyaddress",             &getreceivedbyaddress,          {"address","minconf"} },
     { "wallet",             "getreceivedbylabel",               &getreceivedbylabel,            {"label","minconf"} },
     { "wallet",             "gettransaction",                   &gettransaction,                {"txid","include_watchonly"} },
-    { "wallet",             "getunconfirmedbalance",            &getunconfirmedbalance,         {} },
-    { "wallet",             "getbalances",                      &getbalances,                   {} },
-    { "wallet",             "getwalletinfo",                    &getwalletinfo,                 {} },
+    { "wallet",             "getunconfirmedbalance",            &getunconfirmedbalance,         {"with_tokens"} },
+    { "wallet",             "getbalances",                      &getbalances,                   {"with_tokens"} },
+    { "wallet",             "getwalletinfo",                    &getwalletinfo,                 {"with_tokens"} },
     { "wallet",             "importaddress",                    &importaddress,                 {"address","label","rescan","p2sh"} },
     { "wallet",             "importmulti",                      &importmulti,                   {"requests","options"} },
     { "wallet",             "importprivkey",                    &importprivkey,                 {"privkey","label","rescan"} },
