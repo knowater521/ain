@@ -8,8 +8,18 @@
 
 #include <stdint.h>
 
+#include <map>
+
 /** Amount in satoshis (Can be negative) */
 typedef int64_t CAmount;
+
+typedef uint32_t DCT_ID; // Defi Custom Token ID
+typedef std::map<DCT_ID, CAmount> TAmounts;
+
+struct CTokenAmount { // simple std::pair is less informative
+    DCT_ID nTokenId;
+    CAmount nValue;
+};
 
 static const CAmount COIN = 100000000;
 
