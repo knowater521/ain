@@ -554,6 +554,8 @@ fs::path static StartupShortcutPath()
         return GetSpecialFolderPath(CSIDL_STARTUP) / "Defi.lnk";
     if (chain == CBaseChainParams::TESTNET) // Remove this special case when CBaseChainParams::TESTNET = "testnet4"
         return GetSpecialFolderPath(CSIDL_STARTUP) / "Defi (testnet).lnk";
+    if (chain == CBaseChainParams::DEVNET)
+        return GetSpecialFolderPath(CSIDL_STARTUP) / "Defi (devnet).lnk";
     return GetSpecialFolderPath(CSIDL_STARTUP) / strprintf("Defi (%s).lnk", chain);
 }
 
