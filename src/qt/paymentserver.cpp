@@ -116,7 +116,7 @@ void PaymentServer::ipcParseCommandLine(interfaces::Node& node, int argc, char* 
                 if (IsValidDestinationString(r.address.toStdString(), *tempChainParams)) {
                     node.selectParams(CBaseChainParams::MAIN);
                 } else {
-                    tempChainParams = CreateChainParams(CBaseChainParams::TESTNET);
+                    tempChainParams = CreateChainParams(CBaseChainParams::TESTNET); // not implemented for devnet
                     if (IsValidDestinationString(r.address.toStdString(), *tempChainParams)) {
                         node.selectParams(CBaseChainParams::TESTNET);
                     }
@@ -135,7 +135,7 @@ void PaymentServer::ipcParseCommandLine(interfaces::Node& node, int argc, char* 
                 {
                     node.selectParams(CBaseChainParams::MAIN);
                 }
-                else if (request.getDetails().network() == "test")
+                else if (request.getDetails().network() == "test") // not implemented for devnet
                 {
                     node.selectParams(CBaseChainParams::TESTNET);
                 }
