@@ -253,7 +253,7 @@ static UniValue getmintinginfo(const JSONRPCRequest& request)
     obj.pushKV("isoperator",       (bool) mnIds);
     if (mnIds) {
         obj.pushKV("masternodeid", mnIds->second.GetHex());
-        CMasternode const & node = *pcustomcsview->ExistMasternode(mnIds->second);
+        CMasternode const & node = *pcustomcsview->GetMasternode(mnIds->second);
         auto state = node.GetState();
         obj.pushKV("masternodeoperator", node.operatorAuthAddress.GetHex());
         obj.pushKV("masternodestate", CMasternode::GetHumanReadableState(state));

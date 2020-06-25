@@ -121,16 +121,16 @@ Res ApplyCustomTx(CCustomCSView & base_mnview, CCoinsViewCache const & coins, CT
         switch (guess)
         {
             case CustomTxType::CreateMasternode:
-                res.ok = CheckCreateMasternodeTx(mnview, tx, height, metadata, isCheck); // @todo return Res
+                res = ApplyCreateMasternodeTx(mnview, tx, height, metadata); // @todo return Res
                 break;
             case CustomTxType::ResignMasternode:
-                res.ok = CheckResignMasternodeTx(mnview, tx, height, metadata, isCheck);
+                res = ApplyResignMasternodeTx(mnview, tx, height, metadata);
                 break;
             case CustomTxType::CreateToken:
-                res.ok = CheckCreateTokenTx(mnview, tx, height, metadata, isCheck);
+                res = ApplyCreateTokenTx(mnview, tx, height, metadata);
                 break;
             case CustomTxType::DestroyToken:
-                res.ok = CheckDestroyTokenTx(mnview, coins, tx, height, metadata, isCheck);
+                res = ApplyDestroyTokenTx(mnview, coins, tx, height, metadata);
                 break;
             case CustomTxType::CreateOrder:
                 res = ApplyCreateOrderTx(mnview, coins, tx, height, metadata);
@@ -163,7 +163,7 @@ Res ApplyCustomTx(CCustomCSView & base_mnview, CCoinsViewCache const & coins, CT
         res = Res::Err("unexpected error");
     }
 
-    if (!res.ok) {
+    if (!res.ok || isCheck) { // 'isCheck' - don't create undo nor flush to the upper view
         return res;
     }
 
@@ -184,72 +184,110 @@ Res ApplyCustomTx(CCustomCSView & base_mnview, CCoinsViewCache const & coins, CT
  * Checks if given tx is 'txCreateMasternode'. Creates new MN if all checks are passed
  * Issued by: any
  */
-bool CheckCreateMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata, bool isCheck)
+Res ApplyCreateMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata)
 {
+    const std::string base{"Creation of masternode"};
     // Check quick conditions first
     if (tx.vout.size() < 2 ||
         tx.vout[0].nValue < GetMnCreationFee(height) || tx.vout[0].nTokenId != DCT_ID{0} ||
         tx.vout[1].nValue != GetMnCollateralAmount() || tx.vout[1].nTokenId != DCT_ID{0}
         ) {
-        return false;
+        return Res::Err("%s: %s", base, "malformed tx vouts");
     }
-    CMasternode node(tx, height, metadata);
-    bool result = mnview.CreateMasternode(tx.GetHash(), node);
-    if (!isCheck) {
-        LogPrintf("MN %s: Creation by tx %s at block %d\n", result ? "APPLIED" : "SKIPPED", tx.GetHash().GetHex(), height);
+
+    CMasternode node;
+    CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
+    ss >> node.operatorType;
+    ss >> node.operatorAuthAddress;
+    if (!ss.empty()) {
+        return Res::Err("%s: deserialization failed: excess %d bytes", base,  ss.size());
     }
-    return result;
+
+    CTxDestination dest;
+    if (ExtractDestination(tx.vout[1].scriptPubKey, dest)) {
+        if (dest.which() == 1) {
+            node.ownerType = 1;
+            node.ownerAuthAddress = CKeyID(*boost::get<PKHash>(&dest));
+        }
+        else if (dest.which() == 4) {
+            node.ownerType = 4;
+            node.ownerAuthAddress = CKeyID(*boost::get<WitnessV0KeyHash>(&dest));
+        }
+    }
+    node.creationHeight = height;
+
+    auto res = mnview.CreateMasternode(tx.GetHash(), node);
+    if (!res.ok) {
+        return Res::Err("%s: %s", base, res.msg);
+    }
+    return Res::Ok(base);
 }
 
-bool CheckResignMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, const std::vector<unsigned char> & metadata, bool isCheck)
+Res ApplyResignMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, const std::vector<unsigned char> & metadata)
 {
-    uint256 const nodeId(metadata);
-    auto const node = mnview.ExistMasternode(nodeId);
-    if (!node || !HasAuth(tx, node->ownerAuthAddress))
-        return false;
+    const std::string base{"Resigning of masternode"};
 
-    bool result = mnview.ResignMasternode(nodeId, tx.GetHash(), height);
-    if (!isCheck) {
-        LogPrintf("MN %s: Resign by tx %s at block %d\n", result ? "APPLIED" : "SKIPPED", tx.GetHash().GetHex(), height);
+    if (metadata.size() != sizeof(uint256)) {
+        return Res::Err("%s: metadata must contain 32 bytes", base);
     }
-    return result;
+    uint256 nodeId(metadata);
+    auto const node = mnview.GetMasternode(nodeId);
+    if (!node) {
+        return Res::Err("%s: node %s does not exist", base, nodeId.ToString());
+    }
+    if (!HasAuth(tx, node->ownerAuthAddress)) {
+        return Res::Err("%s %s: %s", base, nodeId.ToString(), "tx must have at least one input from masternode owner");
+    }
+
+    auto res = mnview.ResignMasternode(nodeId, tx.GetHash(), height);
+    if (!res.ok) {
+        return Res::Err("%s %s: %s", base, nodeId.ToString(), res.msg);
+    }
+    return Res::Ok(base);
 }
 
-// @todo All CheckXXXTx in this file should be renamed to ApplyXXXTx
-bool CheckCreateTokenTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata, bool isCheck)
+Res ApplyCreateTokenTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata)
 {
+    const std::string base{"Token creation"};
     // Check quick conditions first
     if (tx.vout.size() < 2 ||
         tx.vout[0].nValue < GetTokenCreationFee(height) || tx.vout[0].nTokenId != DCT_ID{0} ||
         tx.vout[1].nValue != GetTokenCollateralAmount() || tx.vout[1].nTokenId != DCT_ID{0}
         ) {
-        return false;
+        return Res::Err("%s: %s", base, "malformed tx vouts");
     }
     CTokenImplementation token(tx, height, metadata);
-    bool result = mnview.CreateToken(token);
-    if (!isCheck) {
-        LogPrintf("Token %s: Creation '%s' by tx %s at block %d\n", result ? "APPLIED" : "SKIPPED", token.symbol, tx.GetHash().GetHex(), height);
+
+    auto res = mnview.CreateToken(token);
+    if (!res.ok) {
+        return Res::Err("%s %s: %s", base, token.symbol, res.msg);
     }
-    return result;
+
+    return Res::Ok(base);
 }
 
-bool CheckDestroyTokenTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata, bool isCheck)
+Res ApplyDestroyTokenTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata)
 {
-    uint256 const tokenTx(metadata);
-    auto pair = mnview.ExistTokenByCreationTx(tokenTx);
+    const std::string base{"Token destruction"};
+
+    if (metadata.size() != sizeof(uint256)) {
+        return Res::Err("%s: metadata must contain 32 bytes", base);
+    }
+    uint256 tokenTx(metadata);
+    auto pair = mnview.GetTokenByCreationTx(tokenTx);
     if (!pair) {
-        return false;
+        return Res::Err("%s: token with creationTx %s does not exist", base, tokenTx.ToString());
     }
     CTokenImplementation const & token = pair->second;
     if (!HasTokenAuth(tx, coins, token.creationTx)) {
-        return false;
+        return Res::Err("%s: %s", base, "tx must have at least one input from token owner");
     }
 
-    bool result = mnview.DestroyToken(token.creationTx, tx.GetHash(), height);
-    if (!isCheck) {
-        LogPrintf("Token %s: Destruction '%s' by tx %s at block %d\n", result ? "APPLIED" : "SKIPPED", token.symbol, tx.GetHash().GetHex(), height);
+    auto res = mnview.DestroyToken(token.creationTx, tx.GetHash(), height);
+    if (!res.ok) {
+        return Res::Err("%s %s: %s", base, token.symbol, res.msg);
     }
-    return result;
+    return Res::Ok(base);
 }
 
 Res ApplyCreateOrderTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata)
@@ -284,11 +322,11 @@ Res ApplyCreateOrderTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CT
         return Res::ErrCode(CustomTxErrCodes::NotEnoughBalance, "%s: %s", base, res.msg);
     }
     // check tokens are tradeable
-    const auto tokenTake = mnview.ExistToken(order.take.nTokenId);
+    const auto tokenTake = mnview.GetToken(order.take.nTokenId);
     if (!tokenTake || !tokenTake->IsTradeable()) {
         return Res::Err("%s: tokenID %s isn't tradeable", base, order.take.nTokenId.ToString());
     }
-    const auto tokenGive = mnview.ExistToken(order.take.nTokenId);
+    const auto tokenGive = mnview.GetToken(order.take.nTokenId);
     if (!tokenGive || !tokenGive->IsTradeable()) {
         return Res::Err("%s: tokenID %s isn't tradeable", base, order.give.nTokenId.ToString());
     }

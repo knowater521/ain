@@ -280,12 +280,12 @@ public:
     boost::optional<CMasternode> mnExists(const uint256 & nodeId) const override
     {
         LOCK(cs_main);
-        return pcustomcsview->ExistMasternode(nodeId);
+        return pcustomcsview->GetMasternode(nodeId);
     }
     std::unique_ptr<CToken> existTokenGuessId(const std::string & str, DCT_ID & id) const override
     {
         LOCK(cs_main);
-        return pcustomcsview->ExistTokenGuessId(str, id);
+        return pcustomcsview->GetTokenGuessId(str, id);
     }
     double guessVerificationProgress(const uint256& block_hash) override
     {

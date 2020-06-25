@@ -116,7 +116,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     auto myIDs = pcustomcsview->AmIOperator();
     if (!myIDs)
         return nullptr;
-    auto nodePtr = pcustomcsview->ExistMasternode(myIDs->second);
+    auto nodePtr = pcustomcsview->GetMasternode(myIDs->second);
     if (!nodePtr || !nodePtr->IsActive())
         return nullptr;
 
@@ -200,7 +200,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
             CKeyID minter;
             assert(IsDoubleSigned(proof.blockHeader, proof.conflictBlockHeader, minter));
             // not necessary - checked by GetUnpunishedCriminals()
-//            auto itFirstMN = penhancedview->ExistMasternodeByOperator(minter);
+//            auto itFirstMN = penhancedview->GetMasternodeIdByOperator(minter);
 //            assert(itFirstMN && (*itFirstMN) == itCriminalMN->first);
 
             CDataStream metadata(DfCriminalTxMarker, SER_NETWORK, PROTOCOL_VERSION);
@@ -585,7 +585,7 @@ namespace pos {
         uint32_t mintedBlocks(0);
         {
             LOCK(cs_main);
-            auto nodePtr = pcustomcsview->ExistMasternode(args.masternodeID);
+            auto nodePtr = pcustomcsview->GetMasternode(args.masternodeID);
             if (!nodePtr || !nodePtr->IsActive(tip->height)) /// @todo miner: height+1 or nHeight+1 ???
             {
                 /// @todo may be new status for not activated (or already resigned) MN??

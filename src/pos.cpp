@@ -60,10 +60,10 @@ bool ContextualCheckProofOfStake(const CBlockHeader& blockHeader, const Consensu
     {
         // check that block minter exists and active at the height of the block
         AssertLockHeld(cs_main);
-        auto it = mnView->ExistMasternodeByOperator(minter);
+        auto it = mnView->GetMasternodeIdByOperator(minter);
 
         /// @todo check height of history frame here (future and past)
-        if (!it || !mnView->ExistMasternode(*it)->IsActive(blockHeader.height))
+        if (!it || !mnView->GetMasternode(*it)->IsActive(blockHeader.height))
         {
             return false;
         }
@@ -78,7 +78,7 @@ bool ContextualCheckProofOfStake(const CBlockHeader& blockHeader, const Consensu
         AssertLockHeld(cs_main);
         uint32_t const mintedBlocksMaxDiff = static_cast<uint64_t>(mnView->GetLastHeight()) > blockHeader.height ? mnView->GetLastHeight() - blockHeader.height : blockHeader.height - mnView->GetLastHeight();
         // minter exists and active at the height of the block - it was checked before
-        uint32_t const mintedBlocks = mnView->ExistMasternode(masternodeID)->mintedBlocks;
+        uint32_t const mintedBlocks = mnView->GetMasternode(masternodeID)->mintedBlocks;
         uint32_t const mintedBlocksDiff = mintedBlocks > blockHeader.mintedBlocks ? mintedBlocks - blockHeader.mintedBlocks : blockHeader.mintedBlocks - mintedBlocks;
 
         /// @todo this is not so trivial as it seems! do we need an additional check?

@@ -74,10 +74,10 @@ public:
     //! empty constructor
     CMasternode();
     //! construct a CMasternode from a CTransaction, at a given height
-    CMasternode(CTransaction const & tx, int heightIn, std::vector<unsigned char> const & metadata);
+//    CMasternode(CTransaction const & tx, int heightIn, std::vector<unsigned char> const & metadata);
 
     //! constructor helper, runs without any checks
-    void FromTx(CTransaction const & tx, int heightIn, std::vector<unsigned char> const & metadata);
+//    void FromTx(CTransaction const & tx, int heightIn, std::vector<unsigned char> const & metadata);
 
     State GetState() const;
     State GetState(int h) const;
@@ -116,9 +116,9 @@ class CMasternodesView : public virtual CStorageView
 public:
 //    CMasternodesView() = default;
 
-    boost::optional<CMasternode> ExistMasternode(uint256 const & id) const;
-    boost::optional<uint256> ExistMasternodeByOperator(CKeyID const & id) const;
-    boost::optional<uint256> ExistMasternodeByOwner(CKeyID const & id) const;
+    boost::optional<CMasternode> GetMasternode(uint256 const & id) const;
+    boost::optional<uint256> GetMasternodeIdByOperator(CKeyID const & id) const;
+    boost::optional<uint256> GetMasternodeIdByOwner(CKeyID const & id) const;
     void ForEachMasternode(std::function<bool(uint256 const & id, CMasternode & node)> callback);
 
     void IncrementMintedBy(CKeyID const & minter);
@@ -130,10 +130,10 @@ public:
     boost::optional<std::pair<CKeyID, uint256>> AmIOperator() const;
     boost::optional<std::pair<CKeyID, uint256>> AmIOwner() const;
 
-    bool CreateMasternode(uint256 const & nodeId, CMasternode const & node);
-    bool ResignMasternode(uint256 const & nodeId, uint256 const & txid, int height);
-    void UnCreateMasternode(uint256 const & nodeId);
-    void UnResignMasternode(uint256 const & nodeId, uint256 const & resignTx);
+    Res CreateMasternode(uint256 const & nodeId, CMasternode const & node);
+    Res ResignMasternode(uint256 const & nodeId, uint256 const & txid, int height);
+//    void UnCreateMasternode(uint256 const & nodeId);
+//    void UnResignMasternode(uint256 const & nodeId, uint256 const & resignTx);
 
     // tags
     struct ID { static const unsigned char prefix; };

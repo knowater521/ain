@@ -108,7 +108,7 @@ bool CAnchor::CheckAuthSigs(CTeam const & team) const
     return CheckSigs(auth.GetSignHash(), sigs, team);
 }
 
-const CAnchorAuthIndex::Auth * CAnchorAuthIndex::ExistAuth(uint256 const & msgHash) const
+const CAnchorAuthIndex::Auth * CAnchorAuthIndex::GetAuth(uint256 const & msgHash) const
 {
     AssertLockHeld(cs_main);
 
@@ -117,7 +117,7 @@ const CAnchorAuthIndex::Auth * CAnchorAuthIndex::ExistAuth(uint256 const & msgHa
     return it != list.end() ? &(*it) : nullptr;
 }
 
-const CAnchorAuthIndex::Auth * CAnchorAuthIndex::ExistVote(const uint256 & signHash, const CKeyID & signer) const
+const CAnchorAuthIndex::Auth * CAnchorAuthIndex::GetVote(const uint256 & signHash, const CKeyID & signer) const
 {
     AssertLockHeld(cs_main);
 
@@ -132,7 +132,7 @@ bool CAnchorAuthIndex::ValidateAuth(const CAnchorAuthIndex::Auth & auth) const
 
     // 1. common (prev and top checks)
     if (!auth.previousAnchor.IsNull()) {
-        auto prev = panchors->ExistAnchorByTx(auth.previousAnchor);
+        auto prev = panchors->GetAnchorByTx(auth.previousAnchor);
         if (!prev) {
             return error("%s: Got anchor auth, hash %s, blockheight: %d, but can't find previousAnchor %s", __func__, auth.GetHash().ToString(), auth.height, auth.previousAnchor.ToString());
         }
@@ -302,7 +302,7 @@ const CAnchorIndex::AnchorRec * CAnchorIndex::GetActiveAnchor() const
     return top;
 }
 
-const CAnchorIndex::AnchorRec * CAnchorIndex::ExistAnchorByTx(const uint256 & hash) const
+const CAnchorIndex::AnchorRec * CAnchorIndex::GetAnchorByTx(const uint256 & hash) const
 {
     AssertLockHeld(cs_main);
 
@@ -359,7 +359,7 @@ CCustomCSView::CTeam CAnchorIndex::GetNextTeam(const uint256 & btcPrevTx) const
     if (btcPrevTx.IsNull())
         return Params().GetGenesisTeam();
 
-    AnchorRec const * prev = ExistAnchorByTx(btcPrevTx);
+    AnchorRec const * prev = GetAnchorByTx(btcPrevTx);
     if (!prev) {
         LogPrintf("Can't get previous anchor with btc hash %s\n",  btcPrevTx.ToString());
         return CCustomCSView::CTeam{};
@@ -577,7 +577,7 @@ bool ValidateAnchor(const CAnchor & anchor, bool noThrow)
     try {
         // common: check heights and prevs
         if (!anchor.previousAnchor.IsNull()) {
-            auto prev = panchors->ExistAnchorByTx(anchor.previousAnchor);
+            auto prev = panchors->GetAnchorByTx(anchor.previousAnchor);
 
             if (!prev) {
                 // I think this should not happen cause auth sigs
@@ -676,7 +676,7 @@ bool CAnchorAwaitingConfirms::EraseAnchor(AnchorTxHash const &txHash)
     return count > 0;
 }
 
-const CAnchorConfirmMessage *CAnchorAwaitingConfirms::Exist(ConfirmMessageHash const &msgHash) const
+const CAnchorConfirmMessage *CAnchorAwaitingConfirms::GetConfirm(ConfirmMessageHash const &msgHash) const
 {
     AssertLockHeld(cs_main);
 
@@ -693,8 +693,8 @@ bool CAnchorAwaitingConfirms::Validate(CAnchorConfirmMessage const &confirmMessa
         LogPrintf("AnchorConfirms::Validate: Warning! Signature incorrect. btcTxHash: %s confirmMessageHash: %s Key: %s\n", confirmMessage.btcTxHash.ToString(), confirmMessage.GetHash().ToString(), signer.ToString());
         return false;
     }
-    auto it = pcustomcsview->ExistMasternodeByOperator(signer);
-    if (!it || !pcustomcsview->ExistMasternode(*it)->IsActive()) {
+    auto it = pcustomcsview->GetMasternodeIdByOperator(signer);
+    if (!it || !pcustomcsview->GetMasternode(*it)->IsActive()) {
         LogPrintf("AnchorConfirms::Validate: Warning! Masternode with operator key %s does not exist or not active!\n", signer.ToString());
         return false;
     }
@@ -718,14 +718,14 @@ void CAnchorAwaitingConfirms::ReVote()
     AssertLockHeld(cs_main);
 
     auto myIDs = pcustomcsview->AmIOperator();
-    if (myIDs && pcustomcsview->ExistMasternode(myIDs->second)->IsActive()) {
+    if (myIDs && pcustomcsview->GetMasternode(myIDs->second)->IsActive()) {
         auto const & currentTeam = pcustomcsview->GetCurrentTeam();
         if (currentTeam.find(myIDs->first) != currentTeam.end()) {
 
             CAnchorIndex::UnrewardedResult unrewarded = panchors->GetUnrewarded();
             for (auto const & btcTxHash : unrewarded) {
                 /// @todo non-optimal! (secondary checks of amI, keys etc...)
-                pcustomcsview->CreateAndRelayConfirmMessageIfNeed(panchors->ExistAnchorByTx(btcTxHash)->anchor, btcTxHash);
+                pcustomcsview->CreateAndRelayConfirmMessageIfNeed(panchors->GetAnchorByTx(btcTxHash)->anchor, btcTxHash);
             }
         }
     }
