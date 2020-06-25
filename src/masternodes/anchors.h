@@ -155,8 +155,8 @@ public:
         >
     > Auths;
 
-    Auth const * ExistAuth(uint256 const & msgHash) const;
-    Auth const * ExistVote(uint256 const & signHash, CKeyID const & signer) const;
+    Auth const * GetAuth(uint256 const & msgHash) const;
+    Auth const * GetVote(uint256 const & signHash, CKeyID const & signer) const;
     bool ValidateAuth(Auth const & auth) const;
     bool AddAuth(Auth const & auth);
 
@@ -210,7 +210,7 @@ public:
     AnchorRec const * GetActiveAnchor() const;
     bool ActivateBestAnchor(bool forced = false); // rescan anchors
 
-    AnchorRec const * ExistAnchorByTx(uint256 const & hash) const;
+    AnchorRec const * GetAnchorByTx(uint256 const & hash) const;
 
     bool AddAnchor(CAnchor const & anchor, uint256 const & btcTxHash, THeight btcBlockHeight, bool overwrite = true);
     bool DeleteAnchorByBtcTx(uint256 const & btcTxHash);
@@ -351,7 +351,7 @@ protected:
 
 public:
     bool EraseAnchor(AnchorTxHash const &txHash);
-    const CAnchorConfirmMessage *Exist(ConfirmMessageHash const &msgHash) const;
+    const CAnchorConfirmMessage *GetConfirm(ConfirmMessageHash const &msgHash) const;
     bool Add(CAnchorConfirmMessage const &newConfirmMessage);
     bool Validate(CAnchorConfirmMessage const &confirmMessage) const;
     void Clear();

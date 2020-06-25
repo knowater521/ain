@@ -22,6 +22,7 @@ static const std::vector<unsigned char> DfTxMarker = {'D', 'f', 'T', 'x'};  // 4
 
 enum CustomTxErrCodes : uint32_t {
     NotSpecified = 0,
+//    NotCustomTx  = 1,
     NotEnoughBalance = 1024,
     Fatal = uint32_t(1) << 31 // not allowed to fail
 };
@@ -78,12 +79,12 @@ bool HasTokenAuth(CTransaction const & tx, CCoinsViewCache const & coins, uint25
 
 Res ApplyCustomTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, const Consensus::Params& consensusParams, uint32_t height, bool isCheck = true);
 //! Deep check (and write)
-bool CheckCreateMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata, bool isCheck);
-bool CheckResignMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata, bool isCheck);
+Res ApplyCreateMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata);
+Res ApplyResignMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata);
 
-bool CheckCreateTokenTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata, bool isCheck);
-bool CheckDestroyTokenTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata, bool isCheck);
-bool CheckMintTokenTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata, bool isCheck);
+Res ApplyCreateTokenTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata);
+Res ApplyDestroyTokenTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata);
+Res ApplyMintTokenTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata);
 
 Res ApplyCreateOrderTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata);
 Res ApplyDestroyOrderTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata);

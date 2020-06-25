@@ -214,7 +214,7 @@ TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransaction>&
         LOCK(cs_main);
         tip = ::ChainActive().Tip();
 
-        auto nodePtr = pcustomcsview->ExistMasternode(masternodeID);
+        auto nodePtr = pcustomcsview->GetMasternode(masternodeID);
         if (!nodePtr || !nodePtr->IsActive(tip->height))
             throw std::runtime_error(std::string(__func__) + ": nodePtr does not exist");
 
