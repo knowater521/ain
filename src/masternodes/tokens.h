@@ -8,6 +8,7 @@
 #include <flushablestorage.h>
 
 #include <amount.h>
+#include <masternodes/res.h>
 #include <script/script.h>
 #include <serialize.h>
 #include <uint256.h>
@@ -112,9 +113,9 @@ class CStableTokens {
     std::map<std::string, DCT_ID> indexedBySymbol;
 
 public:
-    static CStableTokens const & Get();
-    std::unique_ptr<CToken> Exist(DCT_ID id) const;
-    boost::optional<std::pair<DCT_ID, std::unique_ptr<CToken>>> Exist(std::string const & symbol) const;
+    static CStableTokens const & Instance();
+    std::unique_ptr<CToken> GetToken(DCT_ID id) const;
+    boost::optional<std::pair<DCT_ID, std::unique_ptr<CToken>>> GetToken(std::string const & symbol) const;
     bool ForEach(std::function<bool(DCT_ID const & id, CToken const & token)> callback) const;
 };
 
@@ -126,17 +127,17 @@ public:
     static const unsigned char DB_TOKEN_LASTID; // = 'L';
 
     using CTokenImpl = CTokenImplementation;
-    std::unique_ptr<CToken> ExistToken(DCT_ID id) const;
-    boost::optional<std::pair<DCT_ID, std::unique_ptr<CToken>>> ExistToken(std::string const & symbol) const;
+    std::unique_ptr<CToken> GetToken(DCT_ID id) const;
+    boost::optional<std::pair<DCT_ID, std::unique_ptr<CToken>>> GetToken(std::string const & symbol) const;
     // the only possible type of token (with creationTx) is CTokenImpl
-    boost::optional<std::pair<DCT_ID, CTokenImpl>> ExistTokenByCreationTx(uint256 const & txid) const;
-    std::unique_ptr<CToken> ExistTokenGuessId(const std::string & str, DCT_ID & id) const;
+    boost::optional<std::pair<DCT_ID, CTokenImpl>> GetTokenByCreationTx(uint256 const & txid) const;
+    std::unique_ptr<CToken> GetTokenGuessId(const std::string & str, DCT_ID & id) const;
 
     void ForEachToken(std::function<bool(DCT_ID const & id, CToken const & token)> callback);
 
-    bool CreateToken(CTokenImpl const & token);
+    Res CreateToken(CTokenImpl const & token);
     bool RevertCreateToken(uint256 const & txid);
-    bool DestroyToken(uint256 const & tokenTx, uint256 const & txid, int height);
+    Res DestroyToken(uint256 const & tokenTx, uint256 const & txid, int height);
     bool RevertDestroyToken(uint256 const & tokenTx, uint256 const & txid);
 
     // tags

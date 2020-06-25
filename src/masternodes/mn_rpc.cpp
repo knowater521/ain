@@ -312,13 +312,13 @@ UniValue createmasternode(const JSONRPCRequest& request) {
     {
         auto locked_chain = pwallet->chain().lock();
 
-        if (pcustomcsview->ExistMasternodeByOwner(ownerAuthKey) ||
-            pcustomcsview->ExistMasternodeByOperator(ownerAuthKey)) {
+        if (pcustomcsview->GetMasternodeIdByOwner(ownerAuthKey) ||
+            pcustomcsview->GetMasternodeIdByOperator(ownerAuthKey)) {
             throw JSONRPCError(RPC_INVALID_PARAMETER,
                                "Masternode with collateralAddress == " + collateralAddress + " already exists");
         }
-        if (pcustomcsview->ExistMasternodeByOwner(operatorAuthKey) ||
-            pcustomcsview->ExistMasternodeByOperator(operatorAuthKey)) {
+        if (pcustomcsview->GetMasternodeIdByOwner(operatorAuthKey) ||
+            pcustomcsview->GetMasternodeIdByOperator(operatorAuthKey)) {
             throw JSONRPCError(RPC_INVALID_PARAMETER,
                                "Masternode with operatorAuthAddress == " + EncodeDestination(operatorDest) +
                                " already exists");
@@ -392,7 +392,7 @@ UniValue resignmasternode(const JSONRPCRequest& request) {
             throw JSONRPCError(RPC_INVALID_PARAMETER,
                                strprintf("You are not the owner of masternode %s, or it does not exist", nodeIdStr));
         }
-        auto nodePtr = pcustomcsview->ExistMasternode(nodeId);
+        auto nodePtr = pcustomcsview->GetMasternode(nodeId);
         if (nodePtr->banHeight != -1) {
             throw JSONRPCError(RPC_INVALID_PARAMETER,
                                strprintf("Masternode %s was criminal, banned at height %i by tx %s", nodeIdStr,
@@ -502,7 +502,7 @@ UniValue listmasternodes(const JSONRPCRequest& request) {
     } else {
         for (size_t idx = 0; idx < inputs.size(); ++idx) {
             uint256 id = ParseHashV(inputs[idx], "masternode id");
-            auto const node = pcustomcsview->ExistMasternode(id);
+            auto const node = pcustomcsview->GetMasternode(id);
             if (node) {
                 ret.pushKV(id.GetHex(),
                            verbose ? mnToJSON(*node) : CMasternode::GetHumanReadableState(node->GetState()));
@@ -588,11 +588,11 @@ UniValue createtoken(const JSONRPCRequest& request) {
                        "\"hex\"                  (string) The hex-encoded raw transaction with signature(s)\n"
                },
                RPCExamples{
-                       HelpExampleCli("createmasternode", "\"[{\\\"txid\\\":\\\"id\\\",\\\"vout\\\":0}]\" "
+                       HelpExampleCli("createtoken", "\"[{\\\"txid\\\":\\\"id\\\",\\\"vout\\\":0}]\" "
                                                           "\"{\\\"symbol\\\":\\\"MyToken\\\","
                                                           "\\\"collateralAddress\\\":\\\"address\\\""
                                                           "}\"")
-                       + HelpExampleRpc("createmasternode", "\"[{\\\"txid\\\":\\\"id\\\",\\\"vout\\\":0}]\" "
+                       + HelpExampleRpc("createtoken", "\"[{\\\"txid\\\":\\\"id\\\",\\\"vout\\\":0}]\" "
                                                             "\"{\\\"symbol\\\":\\\"MyToken\\\","
                                                             "\\\"collateralAddress\\\":\\\"address\\\""
                                                             "}\"")
@@ -637,7 +637,7 @@ UniValue createtoken(const JSONRPCRequest& request) {
     int height{0};
     {
         auto locked_chain = pwallet->chain().lock();
-        if (pcustomcsview->ExistToken(symbol)) {
+        if (pcustomcsview->GetToken(symbol)) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Token with symbol '" + symbol + "' already exists");
         }
         height = ::ChainActive().Height();
@@ -711,7 +711,7 @@ UniValue destroytoken(const JSONRPCRequest& request) {
     {
         pwallet->BlockUntilSyncedToCurrentChain();
         auto locked_chain = pwallet->chain().lock();
-        auto pair = pcustomcsview->ExistToken(symbol);
+        auto pair = pcustomcsview->GetToken(symbol);
         if (!pair) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Token %s does not exist!", symbol));
         }
@@ -804,7 +804,7 @@ UniValue listtokens(const JSONRPCRequest& request) {
         UniValue key = request.params[0];
         if (key.getType() == UniValue::VNUM) {
             auto id = key.get_int();
-            auto tokenPtr = pcustomcsview->ExistToken(DCT_ID{(uint32_t) id});
+            auto tokenPtr = pcustomcsview->GetToken(DCT_ID{(uint32_t) id});
             if (tokenPtr) {
                 ret.pushKV(std::to_string(id), tokenToJSON(DCT_ID{(uint32_t) id}, *tokenPtr, verbose));
             }
@@ -812,12 +812,12 @@ UniValue listtokens(const JSONRPCRequest& request) {
             std::string key = request.params[0].getValStr();
             uint256 tx;
             if (ParseHashStr(key, tx)) {
-                auto pair = pcustomcsview->ExistTokenByCreationTx(tx);
+                auto pair = pcustomcsview->GetTokenByCreationTx(tx);
                 if (pair) {
                     ret.pushKV(pair->first.ToString(), tokenToJSON(pair->first, pair->second, verbose));
                 }
             } else {
-                auto pair = pcustomcsview->ExistToken(key);
+                auto pair = pcustomcsview->GetToken(key);
                 if (pair) {
                     ret.pushKV(pair->first.ToString(), tokenToJSON(pair->first, *pair->second, verbose));
                 }
@@ -888,7 +888,7 @@ UniValue minttokens(const JSONRPCRequest& request) {
     DCT_ID tokenId{};
     {
         auto locked_chain = pwallet->chain().lock();
-        auto pair = pcustomcsview->ExistToken(symbol);
+        auto pair = pcustomcsview->GetToken(symbol);
         if (!pair) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Token %s does not exist!", symbol));
         }

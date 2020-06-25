@@ -86,40 +86,40 @@ CMasternode::CMasternode()
 {
 }
 
-CMasternode::CMasternode(const CTransaction & tx, int heightIn, const std::vector<unsigned char> & metadata)
-{
-    FromTx(tx, heightIn, metadata);
-}
+//CMasternode::CMasternode(const CTransaction & tx, int heightIn, const std::vector<unsigned char> & metadata)
+//{
+//    FromTx(tx, heightIn, metadata);
+//}
 
-void CMasternode::FromTx(CTransaction const & tx, int heightIn, std::vector<unsigned char> const & metadata)
-{
-    CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
-    ss >> operatorType;
-    ss >> operatorAuthAddress;
+//void CMasternode::FromTx(CTransaction const & tx, int heightIn, std::vector<unsigned char> const & metadata)
+//{
+//    CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
+//    ss >> operatorType;
+//    ss >> operatorAuthAddress;
 
-    ownerType = 0;
-    ownerAuthAddress = {};
+////    ownerType = 0;
+////    ownerAuthAddress = {};
 
-    CTxDestination dest;
-    if (ExtractDestination(tx.vout[1].scriptPubKey, dest)) {
-        if (dest.which() == 1) {
-            ownerType = 1;
-            ownerAuthAddress = CKeyID(*boost::get<PKHash>(&dest));
-        }
-        else if (dest.which() == 4) {
-            ownerType = 4;
-            ownerAuthAddress = CKeyID(*boost::get<WitnessV0KeyHash>(&dest));
-        }
-    }
+//    CTxDestination dest;
+//    if (ExtractDestination(tx.vout[1].scriptPubKey, dest)) {
+//        if (dest.which() == 1) {
+//            ownerType = 1;
+//            ownerAuthAddress = CKeyID(*boost::get<PKHash>(&dest));
+//        }
+//        else if (dest.which() == 4) {
+//            ownerType = 4;
+//            ownerAuthAddress = CKeyID(*boost::get<WitnessV0KeyHash>(&dest));
+//        }
+//    }
 
-    creationHeight = heightIn;
-    resignHeight = -1;
-    banHeight = -1;
+//    creationHeight = heightIn;
+////    resignHeight = -1;
+////    banHeight = -1;
 
-    resignTx = {};
-    banTx = {};
-    mintedBlocks = 0;
-}
+////    resignTx = {};
+////    banTx = {};
+////    mintedBlocks = 0;
+//}
 
 CMasternode::State CMasternode::GetState() const
 {
@@ -230,17 +230,17 @@ bool operator!=(CDoubleSignFact const & a, CDoubleSignFact const & b)
 /*
  *  CMasternodesView
  */
-boost::optional<CMasternode> CMasternodesView::ExistMasternode(const uint256 & id) const
+boost::optional<CMasternode> CMasternodesView::GetMasternode(const uint256 & id) const
 {
     return ReadBy<ID, CMasternode>(id);
 }
 
-boost::optional<uint256> CMasternodesView::ExistMasternodeByOperator(const CKeyID & id) const
+boost::optional<uint256> CMasternodesView::GetMasternodeIdByOperator(const CKeyID & id) const
 {
     return ReadBy<Operator, uint256>(id);
 }
 
-boost::optional<uint256> CMasternodesView::ExistMasternodeByOwner(const CKeyID & id) const
+boost::optional<uint256> CMasternodesView::GetMasternodeIdByOwner(const CKeyID & id) const
 {
     return ReadBy<Owner, uint256>(id);
 }
@@ -252,9 +252,9 @@ void CMasternodesView::ForEachMasternode(std::function<bool (const uint256 &, CM
 
 void CMasternodesView::IncrementMintedBy(const CKeyID & minter)
 {
-    auto nodeId = ExistMasternodeByOperator(minter);
+    auto nodeId = GetMasternodeIdByOperator(minter);
     assert(nodeId);
-    auto node = ExistMasternode(*nodeId);
+    auto node = GetMasternode(*nodeId);
     assert(node);
     ++node->mintedBlocks;
     WriteBy<ID>(*nodeId, *node);
@@ -262,9 +262,9 @@ void CMasternodesView::IncrementMintedBy(const CKeyID & minter)
 
 void CMasternodesView::DecrementMintedBy(const CKeyID & minter)
 {
-    auto nodeId = ExistMasternodeByOperator(minter);
+    auto nodeId = GetMasternodeIdByOperator(minter);
     assert(nodeId);
-    auto node = ExistMasternode(*nodeId);
+    auto node = GetMasternode(*nodeId);
     assert(node);
     --node->mintedBlocks;
     WriteBy<ID>(*nodeId, *node);
@@ -279,7 +279,7 @@ bool CMasternodesView::BanCriminal(const uint256 txid, std::vector<unsigned char
 
     CKeyID minter;
     if (IsDoubleSigned(criminal.first, criminal.second, minter)) {
-        auto node = ExistMasternode(nodeId);
+        auto node = GetMasternode(nodeId);
         if (node && node->operatorAuthAddress == minter && node->banTx.IsNull()) {
             node->banTx = txid;
             node->banHeight = height;
@@ -299,7 +299,7 @@ bool CMasternodesView::UnbanCriminal(const uint256 txid, std::vector<unsigned ch
     ss >> criminal.first >> criminal.second >> nodeId; // mnid is totally unnecessary!
 
     // there is no need to check doublesigning or smth, we just rolling back previously approved (or ignored) banTx!
-    auto node = ExistMasternode(nodeId);
+    auto node = GetMasternode(nodeId);
     if (node && node->banTx == txid) {
         node->banTx = {};
         node->banHeight = -1;
@@ -314,7 +314,7 @@ boost::optional<std::pair<CKeyID, uint256> > CMasternodesView::AmIOperator() con
     CTxDestination dest = DecodeDestination(gArgs.GetArg("-masternode_operator", ""));
     CKeyID const authAddress = dest.which() == 1 ? CKeyID(*boost::get<PKHash>(&dest)) : (dest.which() == 4 ? CKeyID(*boost::get<WitnessV0KeyHash>(&dest)) : CKeyID());
     if (!authAddress.IsNull()) {
-        auto nodeId = ExistMasternodeByOperator(authAddress);
+        auto nodeId = GetMasternodeIdByOperator(authAddress);
         if (nodeId)
             return { std::make_pair(authAddress, *nodeId) };
     }
@@ -326,70 +326,70 @@ boost::optional<std::pair<CKeyID, uint256> > CMasternodesView::AmIOwner() const
     CTxDestination dest = DecodeDestination(gArgs.GetArg("-masternode_owner", ""));
     CKeyID const authAddress = dest.which() == 1 ? CKeyID(*boost::get<PKHash>(&dest)) : (dest.which() == 4 ? CKeyID(*boost::get<WitnessV0KeyHash>(&dest)) : CKeyID());
     if (!authAddress.IsNull()) {
-        auto nodeId = ExistMasternodeByOwner(authAddress);
+        auto nodeId = GetMasternodeIdByOwner(authAddress);
         if (nodeId)
             return { std::make_pair(authAddress, *nodeId) };
     }
     return {};
 }
 
-bool CMasternodesView::CreateMasternode(const uint256 & nodeId, const CMasternode & node)
+Res CMasternodesView::CreateMasternode(const uint256 & nodeId, const CMasternode & node)
 {
     // Check auth addresses and that there in no MN with such owner or operator
     if ((node.operatorType != 1 && node.operatorType != 4 && node.ownerType != 1 && node.ownerType != 4) ||
         node.ownerAuthAddress.IsNull() || node.operatorAuthAddress.IsNull() ||
-        ExistMasternode(nodeId) ||
-        ExistMasternodeByOwner(node.ownerAuthAddress) ||
-        ExistMasternodeByOperator(node.operatorAuthAddress)
+        GetMasternode(nodeId) ||
+        GetMasternodeIdByOwner(node.ownerAuthAddress) ||
+        GetMasternodeIdByOperator(node.operatorAuthAddress)
         ) {
-        return false;
+        return Res::Err("bad owner and|or operator address or node exists", nodeId.ToString());
     }
 
     WriteBy<ID>(nodeId, node);
     WriteBy<Owner>(node.ownerAuthAddress, nodeId);
     WriteBy<Operator>(node.operatorAuthAddress, nodeId);
 
-    return true;
+    return Res::Ok();
 }
 
-bool CMasternodesView::ResignMasternode(const uint256 & nodeId, const uint256 & txid, int height)
+Res CMasternodesView::ResignMasternode(const uint256 & nodeId, const uint256 & txid, int height)
 {
     // auth already checked!
-    auto node = ExistMasternode(nodeId);
+    auto node = GetMasternode(nodeId);
     if (!node) {
-        return false;
+        return Res::Err("node %s does not exists", nodeId.ToString()); /// @todo it was checked
     }
     auto state = node->GetState(height);
     if ((state != CMasternode::PRE_ENABLED && state != CMasternode::ENABLED) /*|| IsAnchorInvolved(nodeId, height)*/) { // if already spoiled by resign or ban, or need for anchor
-        return false;
+        return Res::Err("node %s state is not 'PRE_ENABLED' or 'ENABLED'", nodeId.ToString());
     }
 
     node->resignTx =  txid;
     node->resignHeight = height;
     WriteBy<ID>(nodeId, *node);
 
-    return true;
+    return Res::Ok();
 }
 
-void CMasternodesView::UnCreateMasternode(const uint256 & nodeId)
-{
-    auto node = ExistMasternode(nodeId);
-    if (node) {
-        EraseBy<ID>(nodeId);
-        EraseBy<Operator>(node->operatorAuthAddress);
-        EraseBy<Owner>(node->ownerAuthAddress);
-    }
-}
+//void CMasternodesView::UnCreateMasternode(const uint256 & nodeId)
+//{
+//    auto node = GetMasternode(nodeId);
+//    if (node) {
+//        EraseBy<ID>(nodeId);
+//        EraseBy<Operator>(node->operatorAuthAddress);
+//        EraseBy<Owner>(node->ownerAuthAddress);
+//    }
+//}
 
-void CMasternodesView::UnResignMasternode(const uint256 & nodeId, const uint256 & resignTx)
-{
-    auto node = ExistMasternode(nodeId);
-    if (node && node->resignTx == resignTx) {
-        node->resignHeight = -1;
-        node->resignTx = {};
-        WriteBy<ID>(nodeId, *node);
-    }
-}
+//void CMasternodesView::UnResignMasternode(const uint256 & nodeId, const uint256 & resignTx)
+//{
+//    auto node = GetMasternode(nodeId);
+//    if (node && node->resignTx == resignTx) {
+//        node->resignHeight = -1;
+//        node->resignTx = {};
+//        WriteBy<ID>(nodeId, *node);
+//    }
+//}
 
 /*
  *  CLastHeightView
@@ -496,7 +496,7 @@ void CCustomCSView::CreateAndRelayConfirmMessageIfNeed(const CAnchor & anchor, c
 {
     /// @todo refactor to use AmISignerNow()
     auto myIDs = AmIOperator();
-    if (!myIDs || !ExistMasternode(myIDs->second)->IsActive())
+    if (!myIDs || !GetMasternode(myIDs->second)->IsActive())
         return ;
     CKeyID const & operatorAuthAddress = myIDs->first;
     CTeam const currentTeam = GetCurrentTeam();
@@ -520,7 +520,7 @@ void CCustomCSView::CreateAndRelayConfirmMessageIfNeed(const CAnchor & anchor, c
         return ;
     }
 
-    auto prev = panchors->ExistAnchorByTx(anchor.previousAnchor);
+    auto prev = panchors->GetAnchorByTx(anchor.previousAnchor);
     auto confirmMessage = CAnchorConfirmMessage::Create(anchor, prev? prev->anchor.height : 0, btcTxHash, masternodeKey);
     if (panchorAwaitingConfirms->Add(confirmMessage)) {
         LogPrintf("AnchorConfirms::CreateAndRelayConfirmMessageIfNeed: Create message %s\n", confirmMessage.GetHash().GetHex());
@@ -576,7 +576,7 @@ void CCustomCSView::OnUndoTx(uint256 const & txid, uint32_t height)
 
 bool CCustomCSView::CanSpend(const uint256 & txId, int height) const
 {
-    auto node = ExistMasternode(txId);
+    auto node = GetMasternode(txId);
     // check if it was mn collateral and mn was resigned or banned
     if (node) {
         auto state = node->GetState(height);
@@ -584,7 +584,7 @@ bool CCustomCSView::CanSpend(const uint256 & txId, int height) const
     }
     // check if it was token collateral and token already destroyed
     /// @todo token check for total supply/limit when implemented
-    auto pair = ExistTokenByCreationTx(txId);
+    auto pair = GetTokenByCreationTx(txId);
     return !pair || pair->second.destructionTx != uint256{};
 }
 

@@ -79,7 +79,7 @@ CCriminalProofsView::CMnCriminals CCriminalProofsView::GetUnpunishedCriminals() 
     ForEach<Proofs, uint256, CDoubleSignFact>([&result] (uint256 const & id, CDoubleSignFact & proof) {
 
         // matching with already punished. and this is the ONLY measure!
-        auto node = pcustomcsview->ExistMasternode(id); // assert?
+        auto node = pcustomcsview->GetMasternode(id); // assert?
         if (node && node->banTx.IsNull()) {
             result.emplace(id, std::move(proof));
         }

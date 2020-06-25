@@ -409,7 +409,7 @@ static void UpdateMempoolForReorg(DisconnectedBlockTransactions& disconnectpool,
                     if (pair.first == DCT_ID{0})
                         continue;
                     // remove only if token does not exist any more
-                    if (!pcustomcsview->ExistToken(pair.first)) {
+                    if (!pcustomcsview->GetToken(pair.first)) {
                         mintTokensToRemove.push_back(tx.GetHash());
                     }
                 }
@@ -1915,9 +1915,9 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
     // We are forced not to check this due to the block wasn't signed yet if called by TestBlockValidity()
     if (!fJustCheck && !fIsFakeNet) {
         // Check only that mintedBlocks counter is correct (MN existence and activation was partially checked before in CheckBlock()->ContextualCheckProofOfStake(), but not in the case of fJustCheck)
-        auto nodeId = mnview.ExistMasternodeByOperator(pindex->minter);
+        auto nodeId = mnview.GetMasternodeIdByOperator(pindex->minter);
         assert(nodeId);
-        auto const & node = *mnview.ExistMasternode(*nodeId);
+        auto const & node = *mnview.GetMasternode(*nodeId);
         if (node.mintedBlocks + 1 != block.mintedBlocks)
         {
             return state.Invalid(ValidationInvalidReason::CONSENSUS, error("ConnectBlock(): masternode's %s mintedBlocks should be %d, got %d!",
@@ -3813,7 +3813,7 @@ bool BlockManager::AcceptBlockHeader(const CBlockHeader& block, CValidationState
         if (fCriminals) {
             CKeyID minterKey;
             assert(block.ExtractMinterKey(minterKey));
-            auto it = pcustomcsview->ExistMasternodeByOperator(minterKey);
+            auto it = pcustomcsview->GetMasternodeIdByOperator(minterKey);
             if (it) {
             	auto const & nodeId = *it;
 
@@ -3823,7 +3823,7 @@ bool BlockManager::AcceptBlockHeader(const CBlockHeader& block, CValidationState
             	    pcriminals->WriteMintedBlockHeader(nodeId, block.mintedBlocks, hash, block, fIsFakeNet);
             	}
 
-                auto state = pcustomcsview->ExistMasternode(nodeId)->GetState(block.height);
+                auto state = pcustomcsview->GetMasternode(nodeId)->GetState(block.height);
                 if (state != CMasternode::PRE_BANNED && state != CMasternode::BANNED) { // deny check & addition if masternode was already punished
                     for (std::pair <uint256, CBlockHeader> const & blockHeader : blockHeaders) {
                         if (IsDoubleSignRestricted(block.height, blockHeader.second.height)) { // we already have equal minters and even mintedBlocks counter
@@ -4037,7 +4037,7 @@ bool AmISignerNow(CCustomCSView::CTeam const & team, CKeyID & operatorAuthAddres
     AssertLockHeld(cs_main);
 
     auto const mnId = pcustomcsview->AmIOperator();
-    if (mnId && pcustomcsview->ExistMasternode(mnId->second)->IsActive() && team.find(mnId->first) != team.end()) { // this is safe due to prev call `AmIOperator`
+    if (mnId && pcustomcsview->GetMasternode(mnId->second)->IsActive() && team.find(mnId->first) != team.end()) { // this is safe due to prev call `AmIOperator`
         std::vector<std::shared_ptr<CWallet>> wallets = GetWallets();
         for (auto const & wallet : wallets) {
             if (wallet->GetKey(mnId->first, masternodeKey)) {
@@ -4107,7 +4107,7 @@ void ProcessAuthsIfTipChanged(CBlockIndex const * oldTip, CBlockIndex const * ti
 
         // trying to create and sign new auth
         CAnchorAuthMessage auth(topAnchor ? topAnchor->txHash : uint256(), anchorHeight, anchorBlock->GetBlockHash(), pcustomcsview->CalcNextTeam(anchorBlock->stakeModifier));
-        if (!panchorauths->ExistVote(auth.GetSignHash(), operatorAuthAddress))
+        if (!panchorauths->GetVote(auth.GetSignHash(), operatorAuthAddress))
         {
             auth.SignWithKey(masternodekey);
             LogPrintf("Anchor auth message signed, hash: %s, height: %d, prev: %s, teamSize: %ld, signHash: %s\n",

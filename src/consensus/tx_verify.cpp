@@ -230,8 +230,7 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
     }
 
     if (NotAllowedToFail(txType)) {
-        CCustomCSView mnview_dummy(const_cast<CCustomCSView&>(*mnview)); // don't write into actual DB
-        auto res = ApplyCustomTx(mnview_dummy, inputs, tx, Params(), nSpendHeight, true);
+        auto res = ApplyCustomTx(const_cast<CCustomCSView&>(*mnview), inputs, tx, Params(), nSpendHeight, true); // note for 'isCheck == true' here
         if (!res.ok && (res.code & CustomTxErrCodes::Fatal)) {
             return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-customtx", res.msg);
         }
@@ -247,7 +246,7 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
                 return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-id-stable",
                     strprintf("token id (%s) is StableCoin and can't be minted", tokenId.ToString()));
             }
-            auto token = mnview->ExistToken(tokenId);
+            auto token = mnview->GetToken(tokenId);
             if (!token) {
                 return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-id-absent",
                     strprintf("token id (%s) does not exist", tokenId.ToString()));
