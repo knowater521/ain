@@ -72,7 +72,7 @@ public:
     //! tx related properties
     uint256 creationTx;
     uint256 destructionTx;
-    int32_t creationHeight;
+    int32_t creationHeight; // @todo use unsigned integers, because serialization of signed integers isn't fulled defined
     int32_t destructionHeight;
 
     CTokenImplementation()
