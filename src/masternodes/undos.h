@@ -2,8 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DEFICHAIN_UNDOS_H
-#define DEFICHAIN_UNDOS_H
+#ifndef DEFI_MASTERNODES_UNDOS_H
+#define DEFI_MASTERNODES_UNDOS_H
 
 #include <masternodes/undo.h>
 #include <flushablestorage.h>
@@ -22,4 +22,4 @@ public:
 };
 
 
-#endif //DEFICHAIN_UNDOS_H
+#endif //DEFI_MASTERNODES_UNDOS_H

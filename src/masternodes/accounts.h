@@ -2,8 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DEFI_ACCOUNTS_H
-#define DEFI_ACCOUNTS_H
+#ifndef DEFI_MASTERNODES_ACCOUNTS_H
+#define DEFI_MASTERNODES_ACCOUNTS_H
 
 #include <flushablestorage.h>
 #include <masternodes/res.h>
@@ -27,4 +27,4 @@ public:
     struct ByBalanceKey { static const unsigned char prefix; };
 };
 
-#endif //DEFI_ACCOUNTS_H
+#endif //DEFI_MASTERNODES_ACCOUNTS_H

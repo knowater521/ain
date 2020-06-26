@@ -2,8 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DEFI_ORDER_H
-#define DEFI_ORDER_H
+#ifndef DEFI_MASTERNODES_ORDER_H
+#define DEFI_MASTERNODES_ORDER_H
 
 #include <amount.h>
 #include <script/script.h>
@@ -70,4 +70,4 @@ struct CMatchOrdersMessage
     }
 };
 
-#endif //DEFI_ORDER_H
+#endif //DEFI_MASTERNODES_ORDER_H
