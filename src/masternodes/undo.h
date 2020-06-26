@@ -2,8 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DEFICHAIN_UNDO_H
-#define DEFICHAIN_UNDO_H
+#ifndef DEFI_MASTERNODES_UNDO_H
+#define DEFI_MASTERNODES_UNDO_H
 
 
 #include <cstdint>
@@ -61,4 +61,4 @@ struct CUndo {
 };
 
 
-#endif //DEFICHAIN_UNDO_H
+#endif //DEFI_MASTERNODES_UNDO_H

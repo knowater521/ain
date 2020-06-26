@@ -2,8 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DEFICHAIN_BALANCES_H
-#define DEFICHAIN_BALANCES_H
+#ifndef DEFI_MASTERNODES_BALANCES_H
+#define DEFI_MASTERNODES_BALANCES_H
 
 #include <cstdint>
 #include <amount.h>
@@ -221,4 +221,4 @@ struct BalanceKey {
     }
 };
 
-#endif //DEFICHAIN_BALANCES_H
+#endif //DEFI_MASTERNODES_BALANCES_H

@@ -9,7 +9,10 @@
 #include <flushablestorage.h>
 #include <pubkey.h>
 #include <serialize.h>
+#include <masternodes/accounts.h>
+#include <masternodes/orders.h>
 #include <masternodes/tokens.h>
+#include <masternodes/undos.h>
 #include <uint256.h>
 
 #include <functional>
@@ -19,9 +22,6 @@
 #include <stdint.h>
 
 #include <boost/optional.hpp>
-#include "orders.h"
-#include "undos.h"
-#include "accounts.h"
 
 class CTransaction;
 class CAnchor;

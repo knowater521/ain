@@ -2,6 +2,7 @@
 
 export LC_ALL=C
 KNOWN_VIOLATIONS=(
+    "src/amount.h:.*stoul"
     "src/defi-tx.cpp.*stoul"
     "src/defi-tx.cpp.*trim_right"
     "src/dbwrapper.cpp.*stoul"
