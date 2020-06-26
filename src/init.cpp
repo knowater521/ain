@@ -453,6 +453,7 @@ void SetupServerArgs()
     gArgs.AddArg("-masternode_owner=<address>", "Masternode owner address (default: empty)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     gArgs.AddArg("-masternode_operator=<address>", "Masternode operator address (default: empty)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     gArgs.AddArg("-dummypos", "Flag to skip PoS-related checks (regtest only)", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
+    gArgs.AddArg("-txnotokens", "Flag to force old tx serialization (regtest only)", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
     gArgs.AddArg("-anchorquorum", "Min quorum size (regtest only)", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
     gArgs.AddArg("-anchorsbinding", "Strict binding of defi chain to btc anchors (default: true)", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
     gArgs.AddArg("-spv", "Enable SPV to bitcoin blockchain (default: 1)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
@@ -1192,6 +1193,7 @@ bool AppInitParameterInteraction()
 
     nMaxTipAge = gArgs.GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
     fIsFakeNet = Params().NetworkIDString() == "regtest" && gArgs.GetArg("-dummypos", false);
+    CTxOut::SERIALIZE_FORCED_TO_OLD_IN_TESTS = Params().NetworkIDString() == "regtest" && gArgs.GetArg("-txnotokens", false);
     fCriminals = gArgs.GetArg("-criminals", false);
     return true;
 }

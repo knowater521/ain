@@ -190,7 +190,7 @@ BOOST_AUTO_TEST_CASE(sighash_from_data)
           nHashType = test[3].get_int();
           sigHashHex = test[4].get_str();
 
-          CTxOut::SERIALIZE_FORCED_TO_OLD_IN_TESTS = true;
+          CTxOut::SERIALIZE_FORCED_TO_OLD_IN_TESTS = gArgs.GetArg("-txnotokens", true);
           CDataStream stream(ParseHex(raw_tx), SER_NETWORK, PROTOCOL_VERSION);
           stream >> tx;
 
