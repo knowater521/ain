@@ -21,14 +21,14 @@ BOOST_AUTO_TEST_CASE(tokens)
 {
     BOOST_REQUIRE(GetTokensCount() == 1);
     {   // search by id
-        auto token = pcustomcsview->ExistToken(0);
+        auto token = pcustomcsview->ExistToken(DCT_ID{0});
         BOOST_REQUIRE(token);
         BOOST_REQUIRE(token->symbol == "DFI");
     }
     {   // search by symbol
         auto pair = pcustomcsview->ExistToken("DFI");
         BOOST_REQUIRE(pair);
-        BOOST_REQUIRE(pair->first == 0);
+        BOOST_REQUIRE(pair->first == DCT_ID{0});
         BOOST_REQUIRE(pair->second);
         BOOST_REQUIRE(pair->second->symbol == "DFI");
     }
@@ -40,21 +40,21 @@ BOOST_AUTO_TEST_CASE(tokens)
     BOOST_REQUIRE(pcustomcsview->CreateToken(token1));
     BOOST_REQUIRE(GetTokensCount() == 2);
     {   // search by id
-        auto token = pcustomcsview->ExistToken(128);
+        auto token = pcustomcsview->ExistToken(DCT_ID{128});
         BOOST_REQUIRE(token);
         BOOST_REQUIRE(token->symbol == "DCT1");
     }
     {   // search by symbol
         auto pair = pcustomcsview->ExistToken("DCT1");
         BOOST_REQUIRE(pair);
-        BOOST_REQUIRE(pair->first == 128);
+        BOOST_REQUIRE(pair->first == DCT_ID{128});
         BOOST_REQUIRE(pair->second);
         BOOST_REQUIRE(pair->second->symbol == "DCT1");
     }
     {   // search by tx
         auto pair = pcustomcsview->ExistTokenByCreationTx(uint256S("0x1111"));
         BOOST_REQUIRE(pair);
-        BOOST_REQUIRE(pair->first == 128);
+        BOOST_REQUIRE(pair->first == DCT_ID{128});
         BOOST_REQUIRE(pair->second.creationTx == uint256S("0x1111"));
     }
 
@@ -66,21 +66,21 @@ BOOST_AUTO_TEST_CASE(tokens)
     BOOST_REQUIRE(pcustomcsview->CreateToken(token1));
     BOOST_REQUIRE(GetTokensCount() == 3);
     {   // search by id
-        auto token = pcustomcsview->ExistToken(129);
+        auto token = pcustomcsview->ExistToken(DCT_ID{129});
         BOOST_REQUIRE(token);
         BOOST_REQUIRE(token->symbol == "DCT2");
     }
     {   // search by symbol
         auto pair = pcustomcsview->ExistToken("DCT2");
         BOOST_REQUIRE(pair);
-        BOOST_REQUIRE(pair->first == 129);
+        BOOST_REQUIRE(pair->first == DCT_ID{129});
         BOOST_REQUIRE(pair->second);
         BOOST_REQUIRE(pair->second->symbol == "DCT2");
     }
     {   // search by tx
         auto pair = pcustomcsview->ExistTokenByCreationTx(uint256S("0x2222"));
         BOOST_REQUIRE(pair);
-        BOOST_REQUIRE(pair->first == 129);
+        BOOST_REQUIRE(pair->first == DCT_ID{129});
         BOOST_REQUIRE(pair->second.creationTx == uint256S("0x2222"));
     }
 
@@ -90,7 +90,7 @@ BOOST_AUTO_TEST_CASE(tokens)
     BOOST_REQUIRE(pcustomcsview->RevertCreateToken(uint256S("0x2222")));
     BOOST_REQUIRE(GetTokensCount() == 2);
     {   // search by id
-        auto token = pcustomcsview->ExistToken(128);
+        auto token = pcustomcsview->ExistToken(DCT_ID{128});
         BOOST_REQUIRE(token);
         BOOST_REQUIRE(token->symbol == "DCT1");
     }
@@ -101,7 +101,7 @@ BOOST_AUTO_TEST_CASE(tokens)
     BOOST_REQUIRE(pcustomcsview->CreateToken(token1));
     BOOST_REQUIRE(GetTokensCount() == 3);
     {   // search by id
-        auto token = pcustomcsview->ExistToken(129);
+        auto token = pcustomcsview->ExistToken(DCT_ID{129});
         BOOST_REQUIRE(token);
         BOOST_REQUIRE(token->symbol == "DCT3");
     }
@@ -112,7 +112,7 @@ BOOST_AUTO_TEST_CASE(tokens)
     BOOST_REQUIRE(pcustomcsview->DestroyToken(uint256S("0x2222"), uint256S("0xaaaa"), 999)); // ok
     BOOST_REQUIRE(pcustomcsview->DestroyToken(uint256S("0x2222"), uint256S("0xbbbb"), 999) == false); // already destroyed
     {   // search by id
-        auto token = pcustomcsview->ExistToken(129);
+        auto token = pcustomcsview->ExistToken(DCT_ID{129});
         BOOST_REQUIRE(token);
         auto tokenImpl = static_cast<CTokenImplementation &>(*token);
         BOOST_REQUIRE(tokenImpl.destructionHeight == 999);
@@ -126,7 +126,7 @@ BOOST_AUTO_TEST_CASE(tokens)
     BOOST_REQUIRE(pcustomcsview->RevertDestroyToken(uint256S("0x2222"), uint256S("0xbbbb")) == false); // destroyed, but wrong tx for revert
     BOOST_REQUIRE(pcustomcsview->RevertDestroyToken(uint256S("0x2222"), uint256S("0xaaaa"))); // ok!
     {   // search by id
-        auto token = pcustomcsview->ExistToken(129);
+        auto token = pcustomcsview->ExistToken(DCT_ID{129});
         BOOST_REQUIRE(token);
         auto tokenImpl = static_cast<CTokenImplementation &>(*token);
         BOOST_REQUIRE(tokenImpl.destructionHeight == -1);

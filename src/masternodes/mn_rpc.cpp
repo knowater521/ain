@@ -722,9 +722,9 @@ UniValue listtokens(const JSONRPCRequest& request)
         UniValue key = request.params[0];
         if (key.getType() == UniValue::VNUM) {
             auto id = key.get_int();
-            auto tokenPtr = pcustomcsview->ExistToken(id);
+            auto tokenPtr = pcustomcsview->ExistToken(DCT_ID{(uint32_t) id});
             if (tokenPtr) {
-                ret.pushKV(std::to_string(id), tokenToJSON(id, *tokenPtr, verbose));
+                ret.pushKV(std::to_string(id), tokenToJSON(DCT_ID{(uint32_t) id}, *tokenPtr, verbose));
             }
         }
         else if (request.params[0].getType() == UniValue::VSTR) {
@@ -733,13 +733,13 @@ UniValue listtokens(const JSONRPCRequest& request)
             if (ParseHashStr(key, tx)) {
                 auto pair = pcustomcsview->ExistTokenByCreationTx(tx);
                 if (pair) {
-                    ret.pushKV(std::to_string(pair->first), tokenToJSON(pair->first, pair->second, verbose));
+                    ret.pushKV(pair->first.ToString(), tokenToJSON(pair->first, pair->second, verbose));
                 }
             }
             else {
                 auto pair = pcustomcsview->ExistToken(key);
                 if (pair) {
-                    ret.pushKV(std::to_string(pair->first), tokenToJSON(pair->first, *pair->second, verbose));
+                    ret.pushKV(pair->first.ToString(), tokenToJSON(pair->first, *pair->second, verbose));
                 }
             }
         }
@@ -747,8 +747,8 @@ UniValue listtokens(const JSONRPCRequest& request)
     }
 
     // Dumps all!
-    pcustomcsview->ForEachToken([&ret, verbose] (DCT_ID const & id, CToken const & token) {
-        ret.pushKV(std::to_string(id), tokenToJSON(id, token, verbose));
+    pcustomcsview->ForEachToken([&ret, verbose] (DCT_ID const& id, CToken const & token) {
+        ret.pushKV(id.ToString(), tokenToJSON(id, token, verbose));
         return true;
     });
     return ret;

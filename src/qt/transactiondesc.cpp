@@ -63,8 +63,8 @@ QString TransactionDesc::toHTML(interfaces::Node& node, interfaces::Wallet& wall
     strHTML += "<html><font face='verdana, arial, helvetica, sans-serif'>";
 
     int64_t nTime = wtx.time;
-    CAmount nCredit = wtx.credit[0];    /// @todo tokens: unimplemented in qt, dummy
-    CAmount nDebit = wtx.debit[0];      /// @todo tokens: unimplemented in qt, dummy
+    CAmount nCredit = wtx.credit[DCT_ID{0}];    /// @todo tokens: unimplemented in qt, dummy
+    CAmount nDebit = wtx.debit[DCT_ID{0}];      /// @todo tokens: unimplemented in qt, dummy
     CAmount nNet = nCredit - nDebit;
 
     strHTML += "<b>" + tr("Status") + ":</b> " + FormatTxStatus(wtx, status, inMempool, numBlocks);
@@ -209,7 +209,7 @@ QString TransactionDesc::toHTML(interfaces::Node& node, interfaces::Wallet& wall
             if (fAllToMe)
             {
                 // Payment to self
-                CAmount nChange = wtx.change[0];    /// @todo tokens: unimplemented in qt, dummy
+                CAmount nChange = wtx.change[DCT_ID{0}];    /// @todo tokens: unimplemented in qt, dummy
                 CAmount nValue = nCredit - nChange;
                 strHTML += "<b>" + tr("Total debit") + ":</b> " + DefiUnits::formatHtmlWithUnit(unit, -nValue) + "<br>";
                 strHTML += "<b>" + tr("Total credit") + ":</b> " + DefiUnits::formatHtmlWithUnit(unit, nValue) + "<br>";

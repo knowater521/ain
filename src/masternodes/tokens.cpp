@@ -6,13 +6,13 @@
 #include <core_io.h>
 #include <primitives/transaction.h>
 
-/// @attention make sure that it does not overlap with those in masternodes.cpp !!!
+/// @attention make sure that it does not overlap with those in masternodes.cpp/orders.cpp !!!
 const unsigned char CTokensView::ID          ::prefix = 'T';
 const unsigned char CTokensView::Symbol      ::prefix = 'S';
 const unsigned char CTokensView::CreationTx  ::prefix = 'c';
 const unsigned char CTokensView::LastDctId   ::prefix = 'L';
 
-const DCT_ID CTokensView::DCT_ID_START = 128;
+const DCT_ID CTokensView::DCT_ID_START = DCT_ID{128};
 
 extern const std::string CURRENCY_UNIT;
 
@@ -58,8 +58,8 @@ void CStableTokens::Initialize(CStableTokens & dst)
     DFI.name = "Default Defi token";
     /// ? what about Mintable|Tradable???
 
-    dst.tokens[0] = DFI;
-    dst.indexedBySymbol[DFI.symbol] = 0;
+    dst.tokens[DCT_ID{0}] = DFI;
+    dst.indexedBySymbol[DFI.symbol] = DCT_ID{0};
 }
 
 std::unique_ptr<CToken> CStableTokens::Exist(DCT_ID id) const
@@ -105,7 +105,7 @@ std::unique_ptr<CToken> CTokensView::ExistToken(DCT_ID id) const
     if (id < DCT_ID_START) {
         return CStableTokens::Get().Exist(id);
     }
-    auto tokenImpl = ReadBy<ID, CTokenImpl>(WrapVarInt(id));
+    auto tokenImpl = ReadBy<ID, CTokenImpl>(WrapVarInt(id.v)); // @todo change serialization of DCT_ID to VarInt by default?
     if (tokenImpl)
         return MakeUnique<CTokenImpl>(*tokenImpl);
 
@@ -119,7 +119,7 @@ boost::optional<std::pair<DCT_ID, std::unique_ptr<CToken> > > CTokensView::Exist
         return dst;
 
     DCT_ID id;
-    auto varint = WrapVarInt(id);
+    auto varint = WrapVarInt(id.v);
     if (ReadBy<Symbol, std::string>(symbol, varint)) {
         assert(id >= DCT_ID_START);
         return { std::make_pair(id, std::move(ExistToken(id)))};
@@ -130,7 +130,7 @@ boost::optional<std::pair<DCT_ID, std::unique_ptr<CToken> > > CTokensView::Exist
 boost::optional<std::pair<DCT_ID, CTokensView::CTokenImpl> > CTokensView::ExistTokenByCreationTx(const uint256 & txid) const
 {
     DCT_ID id;
-    auto varint = WrapVarInt(id);
+    auto varint = WrapVarInt(id.v);
     if (ReadBy<CreationTx, uint256>(txid, varint)) {
         auto tokenImpl = ReadBy<ID, CTokenImpl>(varint);
         if (tokenImpl)
@@ -144,10 +144,10 @@ std::unique_ptr<CToken> CTokensView::ExistTokenGuessId(const std::string & str, 
     std::string const key = trim_ws(str);
 
     if (key.empty()) {
-        id = 0;
-        return ExistToken(0);
+        id = DCT_ID{0};
+        return ExistToken(DCT_ID{0});
     }
-    if (ParseUInt32(key, &id))
+    if (ParseUInt32(key, &id.v))
         return ExistToken(id);
 
     uint256 tx;
@@ -174,9 +174,9 @@ void CTokensView::ForEachToken(std::function<bool (const DCT_ID &, const CToken 
         return; // if was inturrupted
 
     DCT_ID tokenId{0};
-    auto hint = WrapVarInt(tokenId);
+    auto hint = WrapVarInt(tokenId.v);
 
-    ForEach<ID, CVarInt<VarIntMode::DEFAULT, DCT_ID>, CTokenImpl>([&tokenId, &callback] (CVarInt<VarIntMode::DEFAULT, DCT_ID> const &, CTokenImpl tokenImpl) {
+    ForEach<ID, CVarInt<VarIntMode::DEFAULT, uint32_t>, CTokenImpl>([&tokenId, &callback] (CVarInt<VarIntMode::DEFAULT, uint32_t> const &, CTokenImpl tokenImpl) {
         return callback(tokenId, tokenImpl);
     }, hint);
 
@@ -194,9 +194,9 @@ bool CTokensView::CreateToken(const CTokensView::CTokenImpl & token)
         return false;
     }
     DCT_ID id = IncrementLastDctId();
-    WriteBy<ID>(WrapVarInt(id), token);
-    WriteBy<Symbol>(token.symbol, WrapVarInt(id));
-    WriteBy<CreationTx>(token.creationTx, WrapVarInt(id));
+    WriteBy<ID>(WrapVarInt(id.v), token);
+    WriteBy<Symbol>(token.symbol, WrapVarInt(id.v));
+    WriteBy<CreationTx>(token.creationTx, WrapVarInt(id.v));
     return true;
 }
 
@@ -210,11 +210,11 @@ bool CTokensView::RevertCreateToken(const uint256 & txid)
     DCT_ID id = pair->first;
     auto lastId = ReadLastDctId();
     if (!lastId || (*lastId) != id) {
-        LogPrintf("Token creation revert error: revert sequence broken! (txid = %s, id = %d, LastDctId = %d)\n", txid.ToString(), id, (lastId ? *lastId : 0));
+        LogPrintf("Token creation revert error: revert sequence broken! (txid = %s, id = %s, LastDctId = %s)\n", txid.ToString(), id.ToString(), (lastId ? lastId->ToString() : DCT_ID{0}.ToString()));
         return false;
     }
     auto const & token = pair->second;
-    EraseBy<ID>(WrapVarInt(id));
+    EraseBy<ID>(WrapVarInt(id.v));
     EraseBy<Symbol>(token.symbol);
     EraseBy<CreationTx>(token.creationTx);
     DecrementLastDctId();
@@ -238,7 +238,7 @@ bool CTokensView::DestroyToken(uint256 const & tokenTx, const uint256 & txid, in
 
     tokenImpl.destructionTx = txid;
     tokenImpl.destructionHeight = height;
-    WriteBy<ID>(WrapVarInt(pair->first), tokenImpl);
+    WriteBy<ID>(WrapVarInt(pair->first.v), tokenImpl);
     return true;
 }
 
@@ -257,7 +257,7 @@ bool CTokensView::RevertDestroyToken(uint256 const & tokenTx, const uint256 & tx
 
     tokenImpl.destructionTx = uint256{};
     tokenImpl.destructionHeight = -1;
-    WriteBy<ID>(WrapVarInt(pair->first), tokenImpl);
+    WriteBy<ID>(WrapVarInt(pair->first.v), tokenImpl);
     return true;
 }
 
@@ -266,7 +266,7 @@ DCT_ID CTokensView::IncrementLastDctId()
     DCT_ID result{DCT_ID_START};
     auto lastDctId = ReadLastDctId();
     if (lastDctId) {
-        result = std::max(*lastDctId + 1, result);
+        result = DCT_ID{std::max(lastDctId->v + 1, result.v)};
     }
     assert (Write(LastDctId::prefix, result));
     return result;
@@ -276,7 +276,7 @@ DCT_ID CTokensView::DecrementLastDctId()
 {
     auto lastDctId = ReadLastDctId();
     if (lastDctId && *lastDctId >= DCT_ID_START) {
-        --(*lastDctId);
+        --(lastDctId->v);
     }
     else {
         LogPrintf("Critical fault: trying to decrement nonexistent DCT_ID or it is lower than DCT_ID_START\n");

@@ -198,13 +198,13 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
     TAmounts values_out = tx.GetValuesOut();
 
     // special (old) case for 'DFI'
-    if (nValuesIn[0] < values_out[0]) {
+    if (nValuesIn[DCT_ID{0}] < values_out[DCT_ID{0}]) {
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-in-belowout",
-            strprintf("value in (%s) < value out (%s)", FormatMoney(nValuesIn[0]), FormatMoney(values_out[0])));
+            strprintf("value in (%s) < value out (%s)", FormatMoney(nValuesIn[DCT_ID{0}]), FormatMoney(values_out[DCT_ID{0}])));
     }
 
     // Tally transaction fees
-    const CAmount txfee_aux = nValuesIn[0] - values_out[0];
+    const CAmount txfee_aux = nValuesIn[DCT_ID{0}] - values_out[DCT_ID{0}];
     if (!MoneyRange(txfee_aux)) {
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-fee-outofrange");
     }
@@ -228,29 +228,29 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
 
     for (auto && it = values_out.begin(); it != values_out.end(); ++it) {
         DCT_ID tokenId = it->first;
-        if (tokenId == 0) // skip defi, check rest
-            continue;
+        if (tokenId == DCT_ID{0}) // skip defi, check rest
+            continue; // @todo isn't it a vulnerability? Can I mint DST 0 freely?
 
         if (isMintTokenTx) {
             if (tokenId < CTokensView::DCT_ID_START) {
                 return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-id-stable",
-                    strprintf("token id (%d) is StableCoin and can't be minted", tokenId));
+                    strprintf("token id (%s) is StableCoin and can't be minted", tokenId.ToString()));
             }
             auto token = mnview->ExistToken(tokenId);
             if (!token) {
                 return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-id-absent",
-                    strprintf("token id (%d) does not exist", tokenId));
+                    strprintf("token id (%s) does not exist", tokenId.ToString()));
             }
             CTokenImplementation const & tokenImpl = static_cast<CTokenImplementation const &>(*token);
             if (!HasAuth(tx, inputs, tokenImpl.creationTx)) {
                 return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-auth",
-                    strprintf("missed auth inputs for token id (%d), are you an owner of that token?", tokenId));
+                    strprintf("missed auth inputs for token id (%s), are you an owner of that token?", tokenId.ToString()));
             }
         }
         else {
             if (it->second < nValuesIn[tokenId]) {
                 return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-in-belowout",
-                    strprintf("token (%d) value in (%s) < value out (%s)", tokenId, FormatMoney(nValuesIn[tokenId]), FormatMoney(it->second)));
+                    strprintf("token (%s) value in (%s) < value out (%s)", tokenId.ToString(), FormatMoney(nValuesIn[tokenId]), FormatMoney(it->second)));
 
             }
         }
