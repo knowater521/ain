@@ -29,8 +29,8 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const interface
 {
     QList<TransactionRecord> parts;
     int64_t nTime = wtx.time;
-    CAmount nCredit = wtx.credit.find(0) != wtx.credit.end() ? wtx.credit.at(0) : 0; /// @todo tokens: unimplemented in qt, dummy
-    CAmount nDebit = wtx.debit.find(0) != wtx.debit.end() ? wtx.debit.at(0) : 0;   /// @todo tokens: unimplemented in qt, dummy
+    CAmount nCredit = wtx.credit.find(DCT_ID{0}) != wtx.credit.end() ? wtx.credit.at(DCT_ID{0}) : 0; /// @todo tokens: unimplemented in qt, dummy
+    CAmount nDebit = wtx.debit.find(DCT_ID{0}) != wtx.debit.end() ? wtx.debit.at(DCT_ID{0}) : 0;   /// @todo tokens: unimplemented in qt, dummy
     CAmount nNet = nCredit - nDebit;
     uint256 hash = wtx.tx->GetHash();
     std::map<std::string, std::string> mapValue = wtx.value_map;
@@ -93,7 +93,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const interface
         if (fAllFromMe && fAllToMe)
         {
             // Payment to self
-            CAmount nChange = wtx.change.find(0) != wtx.change.end() ? wtx.change.at(0) : 0;    /// @todo tokens: unimplemented in qt, dummy
+            CAmount nChange = wtx.change.find(DCT_ID{0}) != wtx.change.end() ? wtx.change.at(DCT_ID{0}) : 0;    /// @todo tokens: unimplemented in qt, dummy
 
             parts.append(TransactionRecord(hash, nTime, TransactionRecord::SendToSelf, "",
                             -(nDebit - nChange), nCredit - nChange));

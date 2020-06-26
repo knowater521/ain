@@ -147,7 +147,7 @@ public:
     }
 
     CTxOut(const CAmount& nValueIn, CScript scriptPubKeyIn);
-    CTxOut(const CAmount& nValueIn, CScript scriptPubKeyIn, uint32_t nTokenIdIn);
+    CTxOut(const CAmount& nValueIn, CScript scriptPubKeyIn, DCT_ID nTokenIdIn);
 
     ADD_SERIALIZE_METHODS;
 
@@ -155,17 +155,18 @@ public:
     inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(nValue);
         READWRITE(scriptPubKey);
-        if ((s.GetVersion() & SERIALIZE_TRANSACTION_NO_TOKENS) || (s.GetType() == SER_GETHASH && nTokenId == 0) || SERIALIZE_FORCED_TO_OLD_IN_TESTS)
+        if ((s.GetVersion() & SERIALIZE_TRANSACTION_NO_TOKENS) || (s.GetType() == SER_GETHASH && nTokenId == DCT_ID{0}) || SERIALIZE_FORCED_TO_OLD_IN_TESTS) {
             return;
+        }
 
-        READWRITE(VARINT(nTokenId));
+        READWRITE(VARINT(nTokenId.v));
     }
 
     void SetNull()
     {
         nValue = -1;
         scriptPubKey.clear();
-        nTokenId = 0;
+        nTokenId = DCT_ID{0};
     }
 
     bool IsNull() const
@@ -174,7 +175,7 @@ public:
     }
 
     bool IsEmpty() const {
-        return (nValue == 0 && scriptPubKey.empty() && nTokenId == 0);
+        return (nValue == 0 && scriptPubKey.empty() && nTokenId == DCT_ID{0});
     }
 
     friend bool operator==(const CTxOut& a, const CTxOut& b)
@@ -187,6 +188,10 @@ public:
     friend bool operator!=(const CTxOut& a, const CTxOut& b)
     {
         return !(a == b);
+    }
+
+    CTokenAmount TokenAmount() const {
+        return CTokenAmount{nTokenId, nValue};
     }
 
     std::string ToString() const;
@@ -260,7 +265,7 @@ public:
     const uint256& GetWitnessHash() const { return m_witness_hash; }
 
     // Return sum of txouts. (extended version: for the given token)
-    CAmount GetValueOut(uint32_t nTokenId = 0) const;
+    CAmount GetValueOut(DCT_ID nTokenId = DCT_ID{0}) const;
     // GetValueIn() is a method on CCoinsViewCache, because
     // inputs must be known to compute value in.
 
@@ -303,7 +308,7 @@ public:
     bool HasTokens() const
     {
         for (size_t i = 0; i < vout.size(); i++) {
-            if (vout[i].nTokenId > 0) {
+            if (vout[i].nTokenId > DCT_ID{0}) {
                 return true;
             }
         }
@@ -355,7 +360,7 @@ struct CMutableTransaction
     bool HasTokens() const
     {
         for (size_t i = 0; i < vout.size(); i++) {
-            if (vout[i].nTokenId > 0) {
+            if (vout[i].nTokenId > DCT_ID{0}) {
                 return true;
             }
         }

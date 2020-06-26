@@ -23,7 +23,7 @@ std::pair<std::string, std::string> SplitTokenAddress(std::string const & output
 
 struct TokenDestination
 {
-    uint32_t tokenId;
+    DCT_ID tokenId;
     CTxDestination destination;
 
     TokenDestination(std::string const & output, interfaces::Chain const & chain);
