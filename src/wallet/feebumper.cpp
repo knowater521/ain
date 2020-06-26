@@ -14,6 +14,7 @@
 #include <util/rbf.h>
 #include <util/system.h>
 #include <util/validation.h>
+#include <masternodes/mn_checks.h>
 
 //! Check whether transaction has descendant in wallet or mempool, or has been
 //! mined, or conflicts with a mined transaction. Return a feebumper::Result.
@@ -117,7 +118,7 @@ Result CreateTotalBumpTransaction(const CWallet* wallet, const uint256& txid, co
     }
 
     // calculate the old fee and fee-rate
-    old_fee = wtx.GetDebit(ISMINE_SPENDABLE)[DCT_ID{0}] - wtx.tx->GetValueOut();
+    old_fee = wtx.GetDebit(ISMINE_SPENDABLE)[DCT_ID{0}] - GetNonMintedValueOut(*wtx.tx, DCT_ID{});
     CFeeRate nOldFeeRate(old_fee, txSize);
     // The wallet uses a conservative WALLET_INCREMENTAL_RELAY_FEE value to
     // future proof against changes to network wide policy for incremental relay

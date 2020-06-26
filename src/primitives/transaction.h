@@ -264,13 +264,13 @@ public:
     const uint256& GetHash() const { return hash; }
     const uint256& GetWitnessHash() const { return m_witness_hash; }
 
-    // Return sum of txouts. (extended version: for the given token)
-    CAmount GetValueOut(DCT_ID nTokenId = DCT_ID{0}) const;
+    // Return sum of txouts. (extended version: for the given token). Doesn't count minted outputs.
+    CAmount GetValueOut(uint32_t mintingOutputsStart = std::numeric_limits<uint32_t>::max(), DCT_ID nTokenId = DCT_ID{0}) const;
     // GetValueIn() is a method on CCoinsViewCache, because
     // inputs must be known to compute value in.
 
-    // Extended version. Return map with sums of txouts by tokenId.
-    TAmounts GetValuesOut() const;
+    // Extended version. Return map with sums of txouts by tokenId. Doesn't count minted outputs.
+    TAmounts GetValuesOut(uint32_t mintingOutputsStart = std::numeric_limits<uint32_t>::max()) const;
 
     /**
      * Get the total transaction size in bytes, including witness data.
