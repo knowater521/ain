@@ -333,7 +333,7 @@ boost::optional<std::pair<CKeyID, uint256> > CMasternodesView::AmIOwner() const
     return {};
 }
 
-bool CMasternodesView::CreateMasternode(const uint256 & nodeId, const CMasternode & node, int txn)
+bool CMasternodesView::CreateMasternode(const uint256 & nodeId, const CMasternode & node)
 {
     // Check auth addresses and that there in no MN with such owner or operator
     if ((node.operatorType != 1 && node.operatorType != 4 && node.ownerType != 1 && node.ownerType != 4) ||
@@ -349,13 +349,10 @@ bool CMasternodesView::CreateMasternode(const uint256 & nodeId, const CMasternod
     WriteBy<Owner>(node.ownerAuthAddress, nodeId);
     WriteBy<Operator>(node.operatorAuthAddress, nodeId);
 
-    // old-style undo
-    //        blocksUndo[node.creationHeight][txn] = std::make_pair(nodeId, MasternodesTxType::CreateMasternode);
-
     return true;
 }
 
-bool CMasternodesView::ResignMasternode(const uint256 & nodeId, const uint256 & txid, int height, int txn)
+bool CMasternodesView::ResignMasternode(const uint256 & nodeId, const uint256 & txid, int height)
 {
     // auth already checked!
     auto node = ExistMasternode(nodeId);
@@ -370,9 +367,6 @@ bool CMasternodesView::ResignMasternode(const uint256 & nodeId, const uint256 & 
     node->resignTx =  txid;
     node->resignHeight = height;
     WriteBy<ID>(nodeId, *node);
-
-    // old-style undo
-    //        blocksUndo[height][txn] = std::make_pair(nodeId, MasternodesTxType::ResignMasternode);
 
     return true;
 }
@@ -539,9 +533,10 @@ void CCustomCSView::CreateAndRelayConfirmMessageIfNeed(const CAnchor & anchor, c
 }
 
 /// @todo refactor to split dependencies
-void CCustomCSView::OnUndoTx(const CTransaction & tx)
+void CCustomCSView::OnUndoTx(uint256 const & txid, uint32_t height)
 {
-    TBytes metadata;
+    // @todo confirm erasure of old code
+    /*TBytes metadata;
     CustomTxType txType = GuessCustomTxType(tx, metadata);
 
     uint256 txid = tx.GetHash();
@@ -570,7 +565,13 @@ void CCustomCSView::OnUndoTx(const CTransaction & tx)
         break;
         default:
         break;
+    }*/
+    const auto undo = this->GetUndo(UndoKey{height, txid});
+    if (!undo) {
+        return; // not custom tx, or no changes done
     }
+    CUndo::Revert(this->GetRaw(), *undo); // revert the changes of this tx
+    this->DelUndo(UndoKey{height, txid}); // erase undo data, it served its purpose
 }
 
 bool CCustomCSView::CanSpend(const uint256 & txId, int height) const

@@ -349,12 +349,15 @@ libdefi_server_a_SOURCES = \
   interfaces/node.cpp \
   init.cpp \
   dbwrapper.cpp \
+  masternodes/accounts.cpp \
   masternodes/anchors.cpp \
   masternodes/criminals.cpp \
   masternodes/masternodes.cpp \
   masternodes/mn_checks.cpp \
   masternodes/mn_rpc.cpp \
+  masternodes/orders.cpp \
   masternodes/tokens.cpp \
+  masternodes/undos.cpp \
   miner.cpp \
   net.cpp \
   net_processing.cpp \

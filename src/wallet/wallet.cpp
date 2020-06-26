@@ -14,6 +14,7 @@
 #include <interfaces/wallet.h>
 #include <key.h>
 #include <masternodes/masternodes.h>
+#include <masternodes/mn_checks.h>
 #include <policy/fees.h>
 #include <policy/policy.h>
 #include <primitives/block.h>
@@ -1923,7 +1924,7 @@ void CWalletTx::GetAmounts(std::list<COutputEntry>& listReceived,
     CAmount nDebit = GetDebit(filter)[DCT_ID{0}]; /// @todo tokens: only for id == 0???
     if (nDebit > 0) // debit>0 means we signed/sent this transaction
     {
-        CAmount nValueOut = tx->GetValueOut();
+        CAmount nValueOut = GetNonMintedValueOut(*tx, DCT_ID{});
         nFee = nDebit - nValueOut;
     }
 
