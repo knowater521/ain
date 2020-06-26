@@ -117,7 +117,8 @@ bool IsStandardTx(const CTransaction& tx, bool permit_bare_multisig, const CFeeR
             return false;
         }
 
-        if (whichType == TX_NULL_DATA)
+        // @todo check that "txout.scriptPubKey.size() > 1" doesn't break anything
+        if (whichType == TX_NULL_DATA && txout.scriptPubKey.size() > 1)
             nDataOut++;
         else if ((whichType == TX_MULTISIG) && (!permit_bare_multisig)) {
             reason = "bare-multisig";
