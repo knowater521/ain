@@ -53,13 +53,38 @@ public:
     virtual bool Flush() = 0;
 };
 
+// doesn't serialize/deserialize vector size
+struct RawTBytes {
+    TBytes& val;
+
+    template<typename Stream>
+    void Serialize(Stream& os) const
+    {
+        os.write((char*)val.data(), val.size());
+    }
+    template<typename Stream>
+    void Unserialize(Stream& is)
+    {
+        val.clear();
+        val.resize(is.size());
+        is.read((char*)val.data(), is.size());
+        /*try {
+            while (true) {
+                unsigned char b;
+                is.read((char*)&b, sizeof(b));
+                val.push_back(b);
+            }
+        } catch (...) {}*/
+    }
+};
+
 // LevelDB glue layer Iterator
 class CStorageLevelDBIterator : public CStorageKVIterator {
 public:
     explicit CStorageLevelDBIterator(std::unique_ptr<CDBIterator>&& it) : it{std::move(it)} { }
     ~CStorageLevelDBIterator() override { }
     void Seek(const TBytes& key) override {
-        it->Seek(key); // lower_bound in fact
+        it->Seek(RawTBytes{(TBytes&) key}); // lower_bound in fact
     }
     void Next() override { it->Next(); }
     bool Valid() override {
@@ -67,11 +92,13 @@ public:
     }
     TBytes Key() override {
         TBytes result;
-        return (it->GetKey(result)) ? result : TBytes{};
+        RawTBytes raw{result};
+        return (it->GetKey(raw)) ? result : TBytes{};
     }
     TBytes Value() override {
         TBytes result;
-        return (it->GetValue(result)) ? result : TBytes{};
+        RawTBytes raw{result};
+        return (it->GetValue(raw)) ? result : TBytes{};
     }
 private:
     std::unique_ptr<CDBIterator> it;
@@ -86,20 +113,25 @@ public:
     explicit CStorageLevelDB(const fs::path& dbName, std::size_t cacheSize, bool fMemory = false, bool fWipe = false, bool fDirectWrite = false)
         : db{dbName, cacheSize, fMemory, fWipe}, directWrite(fDirectWrite) {}
     ~CStorageLevelDB() override { }
-    bool Exists(const TBytes& key) const override { return db.Exists(key); }
+    bool Exists(const TBytes& key) const override {
+        return db.Exists(RawTBytes{(TBytes&)key});
+    }
     bool Write(const TBytes& key, const TBytes& value) override {
         if (directWrite)
-            return db.Write(key, value, true);
-        BatchWrite(key, value);
+            return db.Write(RawTBytes{(TBytes&)key}, RawTBytes{(TBytes&)value}, true);
+        BatchWrite(RawTBytes{(TBytes&)key}, RawTBytes{(TBytes&)value});
         return true;
     }
     bool Erase(const TBytes& key) override {
         if (directWrite)
-            return db.Erase(key, true);
-        BatchErase(key);
+            return db.Erase(RawTBytes{(TBytes&)key}, true);
+        BatchErase(RawTBytes{(TBytes&)key});
         return true;
     }
-    bool Read(const TBytes& key, TBytes& value) const override { return db.Read(key, value); }
+    bool Read(const TBytes& key, TBytes& value) const override {
+        auto rawVal = RawTBytes{(TBytes&)value};
+        return db.Read(RawTBytes{(TBytes&)key}, rawVal);
+    }
     bool Flush() override { // Commit batch
         bool result = true;
         if (batch) {
@@ -170,8 +202,9 @@ public:
                         prevKey = mIt->first;
                     }
                     if (ok) {
-                        key = mIt->first, value = *mIt->second;
-                        prevKey = mIt->first;
+                        key = mIt->first;
+                        value = *mIt->second;
+                        prevKey = key;
                     }
                     if (mapOk) {
                         mIt++;
@@ -219,22 +252,22 @@ private:
 // Flushable Key-Value Storage
 class CFlushableStorageKV : public CStorageKV {
 public:
-    explicit CFlushableStorageKV(CStorageKV& db_) : db(db_) { }
+    explicit CFlushableStorageKV(CStorageKV& db_) : db(db_) {}
     CFlushableStorageKV(const CFlushableStorageKV& db) = delete;
-    ~CFlushableStorageKV() override { }
+    ~CFlushableStorageKV() override {}
     bool Exists(const TBytes& key) const override {
         auto it = changed.find(key);
         if (it != changed.end()) {
-            return !!it->second;
+            return (bool) it->second;
         }
         return db.Exists(key);
     }
     bool Write(const TBytes& key, const TBytes& value) override {
-        changed[key] = boost::optional<TBytes>{value};
+        changed[key] = {value};
         return true;
     }
     bool Erase(const TBytes& key) override {
-        changed[key] = boost::optional<TBytes>{};
+        changed[key] = {};
         return true;
     }
     bool Read(const TBytes& key, TBytes& value) const override {
@@ -336,13 +369,14 @@ public:
     }
 
     template<typename By, typename KeyType, typename ValueType>
-    bool ForEach(std::function<bool(KeyType const &, ValueType &)> callback, KeyType const & hint = KeyType()) {
+    bool ForEach(std::function<bool(KeyType const &, ValueType &)> callback, KeyType const & start = KeyType()) const {
+        auto& self = const_cast<CStorageView&>(*this);
 
         using pref_type = typename std::remove_const<decltype( By::prefix )>::type;
-        auto key = std::make_pair<pref_type, KeyType>(pref_type(By::prefix), KeyType(hint));
+        auto key = std::make_pair<pref_type, KeyType>(pref_type(By::prefix), KeyType(start));
 //            std::pair<char, KeyType> key; // failsafe
 
-        auto it = DB().NewIterator();
+        auto it = self.DB().NewIterator();
         for(it->Seek(DbTypeToBytes(key)); it->Valid() && (BytesToDbType(it->Key(), key), key.first == By::prefix); it->Next()) {
             boost::this_thread::interruption_point();
 
