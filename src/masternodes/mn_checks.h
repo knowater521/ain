@@ -8,6 +8,7 @@
 #include <consensus/params.h>
 #include <masternodes/masternodes.h>
 #include <vector>
+#include <cstring>
 
 class CBlock;
 class CTransaction;
@@ -21,6 +22,12 @@ static const std::vector<unsigned char> DfTxMarker = {'D', 'f', 'T', 'x'};  // 4
 static const std::vector<unsigned char> DfCriminalTxMarker = {'D', 'f', 'C', 'r'};
 static const std::vector<unsigned char> DfAnchorFinalizeTxMarker = {'D', 'f', 'A', 'f'};
 
+enum CustomTxErrCodes : uint32_t {
+    NotSpecified = 0,
+    NotEnoughBalance = 1024,
+    Fatal = uint32_t(1) << 31 // not allowed to fail
+};
+
 enum class CustomTxType : unsigned char
 {
     None = 0,
@@ -30,15 +37,26 @@ enum class CustomTxType : unsigned char
     // custom tokens:
     CreateToken         = 'T',
     MintToken           = 'M',
-    DestroyToken        = 'D'
+    DestroyToken        = 'D',
+    // dex orders
+    CreateOrder         = 'O',
+    DestroyOrder        = 'E',
+    // accounts
+    UtxosToAccount     = 'U',
+    AccountToUtxos     = 'b',
+    AccountToAccount  = 'B'
 };
 
 inline CustomTxType CustomTxCodeToType(unsigned char ch) {
-    char const txtypes[] = "CRTMD";
+    char const txtypes[] = "CRTMDOEUbB";
     if (memchr(txtypes, ch, strlen(txtypes)))
         return static_cast<CustomTxType>(ch);
     else
         return CustomTxType::None;
+}
+
+inline bool NotAllowedToFail(CustomTxType txType) {
+    return txType == CustomTxType::MintToken || txType == CustomTxType::AccountToUtxos;
 }
 
 template<typename Stream>
@@ -56,24 +74,114 @@ inline void Unserialize(Stream& s, CustomTxType & txType) {
 }
 
 bool HasAuth(CTransaction const & tx, CKeyID const & auth);
-bool HasAuth(CTransaction const & tx, const CCoinsViewCache &coins, uint256 const & tokenTx);
+bool HasAuth(CTransaction const & tx, CCoinsViewCache const & coins, CScript const & auth);
+bool HasTokenAuth(CTransaction const & tx, CCoinsViewCache const & coins, uint256 const & tokenTx);
 
-bool CheckCustomTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, const Consensus::Params& consensusParams, int height, int txn, bool isCheck = true);
+Res ApplyCustomTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, const Consensus::Params& consensusParams, uint32_t height, bool isCheck = true);
 //! Deep check (and write)
-bool CheckCreateMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck);
-bool CheckResignMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck);
+bool CheckCreateMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata, bool isCheck);
+bool CheckResignMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata, bool isCheck);
 
-bool CheckCreateTokenTx(CCustomCSView & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck);
-bool CheckDestroyTokenTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck);
-bool CheckMintTokenTx(CCustomCSView & mnview, CTransaction const & tx, int height, int txn, std::vector<unsigned char> const & metadata, bool isCheck);
+bool CheckCreateTokenTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata, bool isCheck);
+bool CheckDestroyTokenTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata, bool isCheck);
+bool CheckMintTokenTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata, bool isCheck);
+
+Res ApplyCreateOrderTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata);
+Res ApplyDestroyOrderTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata);
+
+Res ApplyUtxosToAccountTx(CCustomCSView & mnview, CTransaction const & tx, std::vector<unsigned char> const & metadata);
+Res ApplyAccountToUtxosTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, std::vector<unsigned char> const & metadata);
+Res ApplyAccountToAccountTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, std::vector<unsigned char> const & metadata);
 
 bool IsMempooledCustomTxCreate(const CTxMemPool& pool, const uint256 & txid);
 
 //! Checks if given tx is probably one of 'CustomTx', returns tx type and serialized metadata in 'data'
-CustomTxType GuessCustomTxType(CTransaction const & tx, std::vector<unsigned char> & metadata);
 bool IsCriminalProofTx(CTransaction const & tx, std::vector<unsigned char> & metadata);
 bool IsAnchorRewardTx(CTransaction const & tx, std::vector<unsigned char> & metadata);
 
-bool IsMintTokenTx(CTransaction const & tx);
+// @todo refactor header functions
+/*
+ * Checks if given tx is probably one of 'CustomTx', returns tx type and serialized metadata in 'data'
+*/
+inline CustomTxType GuessCustomTxType(CTransaction const & tx, std::vector<unsigned char> & metadata)
+{
+    if (tx.vout.size() == 0)
+    {
+        return CustomTxType::None;
+    }
+    CScript const & memo = tx.vout[0].scriptPubKey;
+    CScript::const_iterator pc = memo.begin();
+    opcodetype opcode;
+    if (!memo.GetOp(pc, opcode) || opcode != OP_RETURN)
+    {
+        return CustomTxType::None;
+    }
+    if (!memo.GetOp(pc, opcode, metadata) ||
+        (opcode > OP_PUSHDATA1 &&
+         opcode != OP_PUSHDATA2 &&
+         opcode != OP_PUSHDATA4) ||
+        metadata.size() < DfTxMarker.size() + 1 ||     // i don't know how much exactly, but at least MnTxSignature + type prefix
+        memcmp(&metadata[0], &DfTxMarker[0], DfTxMarker.size()) != 0)
+    {
+        return CustomTxType::None;
+    }
+    auto txType = CustomTxCodeToType(metadata[DfTxMarker.size()]);
+    metadata.erase(metadata.begin(), metadata.begin() + DfTxMarker.size() + 1);
+    return txType;
+}
+
+inline boost::optional<std::vector<unsigned char>> GetMintTokenMetadata(const CTransaction & tx)
+{
+    std::vector<unsigned char> metadata;
+    if (GuessCustomTxType(tx, metadata) == CustomTxType::MintToken) {
+        return metadata;
+    }
+    return {};
+}
+
+inline boost::optional<std::vector<unsigned char>> GetAccountToUtxosMetadata(const CTransaction & tx)
+{
+    std::vector<unsigned char> metadata;
+    if (GuessCustomTxType(tx, metadata) == CustomTxType::AccountToUtxos) {
+        return metadata;
+    }
+    return {};
+}
+
+inline boost::optional<CAccountToUtxosMessage> GetAccountToUtxosMsg(const CTransaction & tx)
+{
+    const auto metadata = GetAccountToUtxosMetadata(tx);
+    if (metadata) {
+        CAccountToUtxosMessage msg;
+        try {
+            CDataStream ss(*metadata, SER_NETWORK, PROTOCOL_VERSION);
+            ss >> msg;
+        } catch (...) {
+            return {};
+        }
+        return msg;
+    }
+    return {};
+}
+
+inline TAmounts GetNonMintedValuesOut(const CTransaction & tx)
+{
+    uint32_t mintingOutputsStart = std::numeric_limits<uint32_t>::max();
+    const auto accountToUtxos = GetAccountToUtxosMsg(tx);
+    if (accountToUtxos) {
+        mintingOutputsStart = accountToUtxos->mintingOutputsStart;
+    }
+    return tx.GetValuesOut(mintingOutputsStart);
+}
+
+inline CAmount GetNonMintedValueOut(const CTransaction & tx, DCT_ID tokenID)
+{
+    uint32_t mintingOutputsStart = std::numeric_limits<uint32_t>::max();
+    const auto accountToUtxos = GetAccountToUtxosMsg(tx);
+    if (accountToUtxos) {
+        mintingOutputsStart = accountToUtxos->mintingOutputsStart;
+    }
+    return tx.GetValueOut(mintingOutputsStart, tokenID);
+}
 
 #endif // DEFI_MASTERNODES_MN_CHECKS_H

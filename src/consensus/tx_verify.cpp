@@ -169,7 +169,7 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
                          strprintf("%s: inputs missing/spent", __func__));
     }
 
-    std::map<DCT_ID, CAmount> nValuesIn;
+    TAmounts nValuesIn;
     for (unsigned int i = 0; i < tx.vin.size(); ++i) {
         const COutPoint &prevout = tx.vin[i].prevout;
         const Coin& coin = inputs.AccessCoin(prevout);
@@ -195,7 +195,7 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
     }
 
     /// @attention Keep the order of checks not to break old tests
-    TAmounts values_out = tx.GetValuesOut();
+    TAmounts values_out = GetNonMintedValuesOut(tx);
 
     // special (old) case for 'DFI'
     if (nValuesIn[DCT_ID{0}] < values_out[DCT_ID{0}]) {
@@ -216,22 +216,33 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
     }
 
     // check for tokens values
-    bool isMintTokenTx = IsMintTokenTx(tx);
-    if (!isMintTokenTx && nValuesIn.size() != values_out.size()) {
+    std::vector<unsigned char> dummy;
+    const auto txType = GuessCustomTxType(tx, dummy);
+    // @todo get rid of unique checks for those functions. values_out doesn't contain minted tokens anyway due to GetNonMintedValuesOut (at least for accountToUtxo txs)
+    // @todo after all special checks are cleaned, only ::NotAllowedToFail() should depend on whether it's allowed to fail or not
+    if (txType != CustomTxType::MintToken && nValuesIn.size() != values_out.size()) {
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-tokens-differ",
             strprintf("token values in (%s) != values out (%s)", nValuesIn.size(), values_out.size()));
     }
-    if (isMintTokenTx && nValuesIn.size() != 1) { // it is definitely type zero
+    if (txType == CustomTxType::MintToken && nValuesIn.size() != 1) { // it is definitely type zero
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-inputs",
             strprintf("token inputs for MintToken tx should be Defi coins only"));
+    }
+
+    if (NotAllowedToFail(txType)) {
+        CCustomCSView mnview_dummy(const_cast<CCustomCSView&>(*mnview)); // don't write into actual DB
+        auto res = ApplyCustomTx(mnview_dummy, inputs, tx, Params(), nSpendHeight, true);
+        if (!res.ok && (res.code & CustomTxErrCodes::Fatal)) {
+            return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-customtx", res.msg);
+        }
     }
 
     for (auto && it = values_out.begin(); it != values_out.end(); ++it) {
         DCT_ID tokenId = it->first;
         if (tokenId == DCT_ID{0}) // skip defi, check rest
-            continue; // @todo isn't it a vulnerability? Can I mint DST 0 freely?
+            continue; // @todo why isn't it a vulnerability? Can I mint DST 0 freely?
 
-        if (isMintTokenTx) {
+        if (txType == CustomTxType::MintToken) { // @todo use balances for minting, hence no need for special processing
             if (tokenId < CTokensView::DCT_ID_START) {
                 return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-id-stable",
                     strprintf("token id (%s) is StableCoin and can't be minted", tokenId.ToString()));
@@ -242,12 +253,12 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
                     strprintf("token id (%s) does not exist", tokenId.ToString()));
             }
             CTokenImplementation const & tokenImpl = static_cast<CTokenImplementation const &>(*token);
-            if (!HasAuth(tx, inputs, tokenImpl.creationTx)) {
+            // @todo sometimes it doesn't work. please store owner in DB, instead of recovering from UTXO
+            if (!HasTokenAuth(tx, inputs, tokenImpl.creationTx)) {
                 return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-auth",
                     strprintf("missed auth inputs for token id (%s), are you an owner of that token?", tokenId.ToString()));
             }
-        }
-        else {
+        } else {
             if (it->second < nValuesIn[tokenId]) {
                 return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-in-belowout",
                     strprintf("token (%s) value in (%s) < value out (%s)", tokenId.ToString(), FormatMoney(nValuesIn[tokenId]), FormatMoney(it->second)));

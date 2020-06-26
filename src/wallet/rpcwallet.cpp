@@ -39,6 +39,7 @@
 #include <univalue.h>
 
 #include <functional>
+#include <masternodes/mn_checks.h>
 
 static const std::string WALLET_ENDPOINT_BASE = "/wallet/";
 
@@ -1754,7 +1755,7 @@ static UniValue gettransaction(const JSONRPCRequest& request)
     CAmount nCredit = wtx.GetCredit(*locked_chain, filter)[DCT_ID{0}]; /// @todo tokens: extend?
     CAmount nDebit = wtx.GetDebit(filter)[DCT_ID{0}];                  /// @todo tokens: extend?
     CAmount nNet = nCredit - nDebit;
-    CAmount nFee = (wtx.IsFromMe(filter) ? wtx.tx->GetValueOut() - nDebit : 0);
+    CAmount nFee = (wtx.IsFromMe(filter) ? GetNonMintedValueOut(*wtx.tx, DCT_ID{}) - nDebit : 0);
 
     entry.pushKV("amount", ValueFromAmount(nNet - nFee));
     if (wtx.IsFromMe(filter))

@@ -19,6 +19,9 @@
 #include <stdint.h>
 
 #include <boost/optional.hpp>
+#include "orders.h"
+#include "undos.h"
+#include "accounts.h"
 
 class CTransaction;
 class CAnchor;
@@ -127,8 +130,8 @@ public:
     boost::optional<std::pair<CKeyID, uint256>> AmIOperator() const;
     boost::optional<std::pair<CKeyID, uint256>> AmIOwner() const;
 
-    bool CreateMasternode(uint256 const & nodeId, CMasternode const & node, int txn);
-    bool ResignMasternode(uint256 const & nodeId, uint256 const & txid, int height, int txn);
+    bool CreateMasternode(uint256 const & nodeId, CMasternode const & node);
+    bool ResignMasternode(uint256 const & nodeId, uint256 const & txid, int height);
     void UnCreateMasternode(uint256 const & nodeId);
     void UnResignMasternode(uint256 const & nodeId, uint256 const & resignTx);
 
@@ -182,6 +185,9 @@ class CCustomCSView
         , public CFoundationsDebtView
         , public CAnchorRewardsView
         , public CTokensView
+        , public COrdersView
+        , public CAccountsView
+        , public CUndosView
 {
 public:
     CCustomCSView(CStorageKV & st)
@@ -199,11 +205,15 @@ public:
     void CreateAndRelayConfirmMessageIfNeed(const CAnchor & anchor, const uint256 & btcTxHash);
 
     // simplified version of undo, without any unnecessary undo data
-    void OnUndoTx(CTransaction const & tx);
+    void OnUndoTx(uint256 const & txid, uint32_t height);
 
     bool CanSpend(const uint256 & txId, int height) const;
 
     bool Flush() { return DB().Flush(); }
+
+    CStorageKV& GetRaw() {
+        return DB();
+    }
 };
 
 /** Global DB and view that holds enhanced chainstate data (should be protected by cs_main) */

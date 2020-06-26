@@ -747,7 +747,7 @@ UniValue listtokens(const JSONRPCRequest& request)
     }
 
     // Dumps all!
-    pcustomcsview->ForEachToken([&ret, verbose] (DCT_ID const& id, CToken const & token) {
+    pcustomcsview->ForEachToken([&ret, verbose] (DCT_ID const & id, CToken const & token) {
         ret.pushKV(id.ToString(), tokenToJSON(id, token, verbose));
         return true;
     });

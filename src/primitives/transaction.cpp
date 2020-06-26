@@ -90,10 +90,11 @@ CTransaction::CTransaction() : vin(), vout(), nVersion(CTransaction::CURRENT_VER
 CTransaction::CTransaction(const CMutableTransaction& tx) : vin(tx.vin), vout(tx.vout), nVersion(tx.nVersion), nLockTime(tx.nLockTime), hash{ComputeHash()}, m_witness_hash{ComputeWitnessHash()} {}
 CTransaction::CTransaction(CMutableTransaction&& tx) : vin(std::move(tx.vin)), vout(std::move(tx.vout)), nVersion(tx.nVersion), nLockTime(tx.nLockTime), hash{ComputeHash()}, m_witness_hash{ComputeWitnessHash()} {}
 
-CAmount CTransaction::GetValueOut(DCT_ID nTokenId) const
+CAmount CTransaction::GetValueOut(uint32_t mintingOutputsStart, DCT_ID nTokenId) const
 {
     CAmount nValueOut = 0;
-    for (const auto& tx_out : vout) {
+    for (uint32_t i = 0; i < (uint32_t) vout.size() && i < mintingOutputsStart; i++) {
+        const auto& tx_out = vout[i];
         if (tx_out.nTokenId == nTokenId) {
             nValueOut += tx_out.nValue;
             if (!MoneyRange(tx_out.nValue) || !MoneyRange(nValueOut))
@@ -103,10 +104,11 @@ CAmount CTransaction::GetValueOut(DCT_ID nTokenId) const
     return nValueOut;
 }
 
-TAmounts CTransaction::GetValuesOut() const
+TAmounts CTransaction::GetValuesOut(uint32_t mintingOutputsStart) const
 {
     TAmounts nValuesOut;
-    for (const auto& tx_out : vout) {
+    for (uint32_t i = 0; i < (uint32_t) vout.size() && i < mintingOutputsStart; i++) {
+        const auto& tx_out = vout[i];
         nValuesOut[tx_out.nTokenId] += tx_out.nValue;
         if (!MoneyRange(tx_out.nValue) || !MoneyRange(nValuesOut[tx_out.nTokenId]))
             throw std::runtime_error(std::string(__func__) + ": value out of range");

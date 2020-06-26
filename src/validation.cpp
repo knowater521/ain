@@ -403,7 +403,7 @@ static void UpdateMempoolForReorg(DisconnectedBlockTransactions& disconnectpool,
         std::vector<uint256> mintTokensToRemove; // not sure about tx refs safety while recursive deletion, so hashes
         for (const CTxMemPoolEntry& e : mempool.mapTx) {
             auto tx = e.GetTx();
-            if (IsMintTokenTx(tx)) {
+            if (GetMintTokenMetadata(tx)) {
                 auto values = tx.GetValuesOut();
                 for (auto const & pair : values) {
                     if (pair.first == DCT_ID{0})
@@ -1689,7 +1689,7 @@ DisconnectResult CChainState::DisconnectBlock(const CBlock& block, const CBlockI
         }
 
         // process transactions revert for masternodes
-        mnview.OnUndoTx(tx);
+        mnview.OnUndoTx(tx.GetHash(), (uint32_t) pindex->nHeight);
     }
     // move best block pointer to prevout block
     view.SetBestBlock(pindex->pprev->GetBlockHash());
@@ -1905,7 +1905,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
             view.SetBestBlock(pindex->GetBlockHash());
             // init view|db with genesis here
             for (size_t i = 0; i < block.vtx.size(); ++i) {
-                CheckCustomTx(mnview, view, *block.vtx[i], chainparams.GetConsensus(), pindex->nHeight, i, fJustCheck);
+                ApplyCustomTx(mnview, view, *block.vtx[i], chainparams.GetConsensus(), pindex->nHeight, fJustCheck);
                 AddCoins(view, *block.vtx[i], 0);
             }
         }
@@ -2147,8 +2147,20 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
                     tx.GetHash().ToString(), FormatStateMessage(state));
             }
 
-            // we will never fail, but skip
-            CheckCustomTx(mnview, view, tx, chainparams.GetConsensus(), pindex->nHeight, i, fJustCheck);
+            const auto res = ApplyCustomTx(mnview, view, tx, chainparams.GetConsensus(), pindex->nHeight, fJustCheck);
+            if (!res.ok && (res.code & CustomTxErrCodes::Fatal)) {
+                // we will never fail, but skip, unless transaction mints UTXOs
+                return error("ConnectBlock(): ApplyCustomTx on %s failed with %s",
+                             tx.GetHash().ToString(), res.msg);
+            }
+            // log
+            if (!fJustCheck && !res.msg.empty()) {
+                if (res.ok) {
+                    LogPrintf("applied tx %s: %s\n", block.vtx[i]->GetHash().GetHex(), res.msg);
+                } else {
+                    LogPrintf("skipped tx %s: %s\n", block.vtx[i]->GetHash().GetHex(), res.msg);
+                }
+            }
 
             control.Add(vChecks);
         } else {
@@ -2156,7 +2168,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
             if (IsCriminalProofTx(tx, metadata)) {
                 if (tx.GetValueOut() > 0) {
                     return state.Invalid(ValidationInvalidReason::CONSENSUS,
-                                         error("ConnectBlock(): criminal detention pays too much (actual=%d)",
+                                         error("ConnectBlock(): criminal detection pays too much (actual=%d)",
                                                tx.GetValueOut()),
                                          REJECT_INVALID, "bad-cr-amount");
                 }
@@ -2259,7 +2271,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
     int64_t nTime3 = GetTimeMicros(); nTimeConnect += nTime3 - nTime2;
     LogPrint(BCLog::BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs (%.2fms/blk)]\n", (unsigned)block.vtx.size(), MILLI * (nTime3 - nTime2), MILLI * (nTime3 - nTime2) / block.vtx.size(), nInputs <= 1 ? 0 : MILLI * (nTime3 - nTime2) / (nInputs-1), nTimeConnect * MICRO, nTimeConnect * MILLI / nBlocksTotal);
 
-    TAmounts const cbValues = block.vtx[0]->GetValuesOut();
+    TAmounts const cbValues = GetNonMintedValuesOut(*block.vtx[0]);
     CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
     if (cbValues.size() != 1 || cbValues.begin()->first != DCT_ID{0})
         return state.Invalid(ValidationInvalidReason::CONSENSUS,
