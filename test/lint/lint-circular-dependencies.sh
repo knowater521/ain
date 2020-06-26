@@ -47,6 +47,7 @@ EXPECTED_CIRCULAR_DEPENDENCIES=(
     "masternodes/masternodes -> wallet/wallet -> masternodes/masternodes"
     "masternodes/mn_checks -> txmempool -> masternodes/mn_checks"
     "masternodes/mn_checks -> txmempool -> validation -> masternodes/mn_checks"
+    "masternodes/mn_checks -> txmempool -> validation -> wallet/wallet -> masternodes/mn_checks"
     "masternodes/anchors -> spv/spv_wrapper -> masternodes/anchors"
     "masternodes/anchors -> validation -> masternodes/anchors"
     "masternodes/anchors -> masternodes/masternodes -> masternodes/anchors"

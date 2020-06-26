@@ -258,7 +258,7 @@ Res ApplyCreateOrderTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CT
         return Res::Err("Creation of order: deserialization failed: excess %d bytes", ss.size());
     }
     COrder order(orderMsg, height);
-    const auto base = tfm::format("Creation of order, take=%s, give=%s, premium=%s", order.take.ToString(), order.give.ToString(), order.premium.ToString());
+    const auto base = strprintf("Creation of order, take=%s, give=%s, premium=%s", order.take.ToString(), order.give.ToString(), order.premium.ToString());
 
     if (order.give.nValue == 0 || order.take.nValue == 0) {
         return Res::Err("%s: %s", base, "zero order value(s)");
@@ -302,7 +302,7 @@ Res ApplyDestroyOrderTx(CCustomCSView & mnview, CCoinsViewCache const & coins, C
         return Res::Err("Order destruction: %s", "metadata must contain 32 bytes");
     }
     uint256 const orderTx(metadata);
-    const auto base = tfm::format("Destruction of order %s", orderTx.GetHex());
+    const auto base = strprintf("Destruction of order %s", orderTx.GetHex());
     auto order = mnview.GetOrder(orderTx);
     if (!order) {
         return Res::Err("%s: %s", base, "order not found");
@@ -338,7 +338,7 @@ Res ApplyUtxosToAccountTx(CCustomCSView & mnview, CTransaction const & tx, std::
     if (!ss.empty()) {
         return Res::Err("UtxosToAccount tx deserialization failed: excess %d bytes", ss.size());
     }
-    const auto base = tfm::format("Transfer UtxosToAccount: %s", msg.ToString());
+    const auto base = strprintf("Transfer UtxosToAccount: %s", msg.ToString());
 
     // check enough tokens are "burnt"
     const auto burnt = BurntTokens(tx);
@@ -368,7 +368,7 @@ Res ApplyAccountToUtxosTx(CCustomCSView & mnview, CCoinsViewCache const & coins,
     if (!ss.empty()) {
         return Res::Err("AccountToUtxos tx deserialization failed: excess %d bytes", ss.size());
     }
-    const auto base = tfm::format("Transfer AccountToUtxos: %s", msg.ToString());
+    const auto base = strprintf("Transfer AccountToUtxos: %s", msg.ToString());
 
     // check auth
     if (!HasAuth(tx, coins, msg.from)) {
@@ -399,7 +399,7 @@ Res ApplyAccountToAccountTx(CCustomCSView & mnview, CCoinsViewCache const & coin
     if (!ss.empty()) {
         return Res::Err("AccountToAccount tx deserialization failed: excess %d bytes", ss.size());
     }
-    const auto base = tfm::format("Transfer AccountToAccount: %s", msg.ToString());
+    const auto base = strprintf("Transfer AccountToAccount: %s", msg.ToString());
 
     // check auth
     if (!HasAuth(tx, coins, msg.from)) {
