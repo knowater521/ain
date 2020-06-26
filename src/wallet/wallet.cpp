@@ -32,7 +32,6 @@
 #include <validation.h>
 #include <wallet/coincontrol.h>
 #include <wallet/fees.h>
-#include <wallet/coincontrol.h>
 
 #include <algorithm>
 #include <assert.h>

@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "undos.h"
+#include <masternodes/undos.h>
 
 /// @attention make sure that it does not overlap with those in masternodes.cpp/tokens.cpp/undos.cpp/accounts.cpp !!!
 const unsigned char CUndosView::ByUndoKey::prefix = 'u';

@@ -1,5 +1,5 @@
-#ifndef DEFICHAIN_RES_H
-#define DEFICHAIN_RES_H
+#ifndef DEFI_MASTERNODES_RES_H
+#define DEFI_MASTERNODES_RES_H
 
 #include <string>
 #include <tinyformat.h>
@@ -34,10 +34,10 @@ struct Res
 
     std::string ToString() const {
         if (!ok && code != 0) {
-            return tfm::format("ERROR %d: %s", code, msg);
+            return strprintf("ERROR %d: %s", code, msg);
         }
         if (!ok) {
-            return tfm::format("ERROR: %s", msg);
+            return strprintf("ERROR: %s", msg);
         }
         return msg;
     }
@@ -78,4 +78,4 @@ struct ResVal : public Res
     }
 };
 
-#endif //DEFICHAIN_RES_H
+#endif //DEFI_MASTERNODES_RES_H
