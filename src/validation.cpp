@@ -406,7 +406,7 @@ static void UpdateMempoolForReorg(DisconnectedBlockTransactions& disconnectpool,
             if (IsMintTokenTx(tx)) {
                 auto values = tx.GetValuesOut();
                 for (auto const & pair : values) {
-                    if (pair.first == 0)
+                    if (pair.first == DCT_ID{0})
                         continue;
                     // remove only if token does not exist any more
                     if (!pcustomcsview->ExistToken(pair.first)) {
@@ -2261,14 +2261,14 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
 
     TAmounts const cbValues = block.vtx[0]->GetValuesOut();
     CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
-    if (cbValues.size() != 1 || cbValues.begin()->first != 0)
+    if (cbValues.size() != 1 || cbValues.begin()->first != DCT_ID{0})
         return state.Invalid(ValidationInvalidReason::CONSENSUS,
                          error("ConnectBlock(): coinbase should pay only Defi coins"),
                                REJECT_INVALID, "bad-cb-wrong-tokens");
-    if (cbValues.at(0) > blockReward)
+    if (cbValues.at(DCT_ID{0}) > blockReward)
         return state.Invalid(ValidationInvalidReason::CONSENSUS,
                          error("ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)",
-                               cbValues.at(0), blockReward),
+                               cbValues.at(DCT_ID{0}), blockReward),
                                REJECT_INVALID, "bad-cb-amount");
 
     if (!control.Wait())

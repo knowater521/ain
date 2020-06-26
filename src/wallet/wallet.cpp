@@ -31,6 +31,7 @@
 #include <validation.h>
 #include <wallet/coincontrol.h>
 #include <wallet/fees.h>
+#include <wallet/coincontrol.h>
 
 #include <algorithm>
 #include <assert.h>
@@ -1919,7 +1920,7 @@ void CWalletTx::GetAmounts(std::list<COutputEntry>& listReceived,
     listSent.clear();
 
     // Compute fee:
-    CAmount nDebit = GetDebit(filter)[0]; /// @todo tokens: only for id == 0???
+    CAmount nDebit = GetDebit(filter)[DCT_ID{0}]; /// @todo tokens: only for id == 0???
     if (nDebit > 0) // debit>0 means we signed/sent this transaction
     {
         CAmount nValueOut = tx->GetValueOut();
@@ -2243,7 +2244,7 @@ CAmount CWalletTx::GetImmatureCredit(interfaces::Chain::Lock& locked_chain, bool
 {
     if (IsImmatureCoinBase(locked_chain) && IsInMainChain(locked_chain) && !pwallet->chain().mnExists(GetHash())) { /// @todo tokens: assume tokens collaterals?
         auto amounts = GetCachableAmounts(IMMATURE_CREDIT, ISMINE_SPENDABLE, !fUseCache);
-        return amounts.find(0) == amounts.end() ? 0 : amounts.at(0);
+        return amounts.find(DCT_ID{0}) == amounts.end() ? 0 : amounts.at(DCT_ID{0});
     }
 
     return 0;
@@ -2299,7 +2300,7 @@ CAmount CWalletTx::GetImmatureWatchOnlyCredit(interfaces::Chain::Lock& locked_ch
 {
     if (IsImmatureCoinBase(locked_chain) && IsInMainChain(locked_chain)) {
         auto amounts = GetCachableAmounts(IMMATURE_CREDIT, ISMINE_WATCH_ONLY, !fUseCache);
-        return amounts.find(0) == amounts.end() ? 0 : amounts.at(0);
+        return amounts.find(DCT_ID{0}) == amounts.end() ? 0 : amounts.at(DCT_ID{0});
     }
 
     return 0;
@@ -2690,11 +2691,11 @@ bool CWallet::SelectCoinsMinConf(const CAmount& nTargetValue, const CoinEligibil
             group.effective_value = 0;
             for (auto it = group.m_outputs.begin(); it != group.m_outputs.end(); ) {
                 const CInputCoin& coin = *it;
-                CAmount effective_value = coin.txout.nValue - (coin.m_input_bytes < 0 || coin.txout.nTokenId != 0 ? 0 : coin_selection_params.effective_fee.GetFee(coin.m_input_bytes));
+                CAmount effective_value = coin.txout.nValue - (coin.m_input_bytes < 0 || coin.txout.nTokenId != DCT_ID{0} ? 0 : coin_selection_params.effective_fee.GetFee(coin.m_input_bytes));
                 // Only include outputs that are positive effective value (i.e. not dust)
                 if (effective_value > 0) {
-                    group.fee += coin.m_input_bytes < 0 || coin.txout.nTokenId != 0 ? 0 : coin_selection_params.effective_fee.GetFee(coin.m_input_bytes);
-                    group.long_term_fee += coin.m_input_bytes < 0 || coin.txout.nTokenId != 0 ? 0 : long_term_feerate.GetFee(coin.m_input_bytes);
+                    group.fee += coin.m_input_bytes < 0 || coin.txout.nTokenId != DCT_ID{0} ? 0 : coin_selection_params.effective_fee.GetFee(coin.m_input_bytes);
+                    group.long_term_fee += coin.m_input_bytes < 0 || coin.txout.nTokenId != DCT_ID{0} ? 0 : long_term_feerate.GetFee(coin.m_input_bytes);
                     group.effective_value += effective_value;
                     ++it;
                 } else {
@@ -2722,7 +2723,7 @@ bool CWallet::SelectCoins(const std::vector<COutput>& vAvailableCoins, const CAm
 {
     std::vector<COutput> vCoins(vAvailableCoins);
     assert(coin_control.m_tokenFilter.size() <= 1);
-    uint32_t onlyToken = coin_control.m_tokenFilter.empty() ? 0 : *coin_control.m_tokenFilter.begin();
+    DCT_ID onlyToken = coin_control.m_tokenFilter.empty() ? DCT_ID{0} : *coin_control.m_tokenFilter.begin();
 
     // coin control -> return all selected outputs (we want all selected to go into the transaction for sure)
     if (coin_control.HasSelected() && !coin_control.fAllowOtherInputs)
@@ -2973,7 +2974,7 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
     std::vector<CRecipient> vecSend(vecSendOrig);
 
 
-    std::map<uint32_t, CAmount> vTokenValues;
+    std::map<DCT_ID, CAmount> vTokenValues;
     ReserveDestination reservedest(this);
     int nChangePosRequest = nChangePosInOut; /// @todo tokens
     unsigned int nSubtractFeeFromAmount = 0;
@@ -2984,7 +2985,7 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
             strFailReason = _("Transaction amounts must not be negative").translated;
             return false;
         }
-        if (recipient.nTokenId == 0)
+        if (recipient.nTokenId == DCT_ID{0})
         {
             nValue += recipient.nAmount;
 
@@ -3012,7 +3013,7 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
 
     const OutputType change_type = TransactionChangeType(coin_control.m_change_type ? *coin_control.m_change_type : m_default_change_type, vecSend);
 
-    std::map<uint32_t, ReserveDestination> tokensreservedest;
+    std::map<DCT_ID, ReserveDestination> tokensreservedest;
     std::set<CInputCoin> tokenCoins;
     {
         auto locked_chain = chain().lock();
@@ -3022,7 +3023,7 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
         {
             std::vector<COutput> vAvailableCoins;
 
-            uint32_t tokenId = it->first;
+            DCT_ID tokenId = it->first;
             CCoinControl ccSingleToken(coin_control);
             ccSingleToken.m_tokenFilter = { tokenId };
 
@@ -3165,7 +3166,7 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
                     coin_selection_params.tx_noinputs_size += ::GetSerializeSize(txout, PROTOCOL_VERSION
                                                                                  | (txNew.nVersion < CTransaction::TOKENS_MIN_VERSION ? SERIALIZE_TRANSACTION_NO_TOKENS : 0));
 
-                    if (txout.nTokenId == 0 && IsDust(txout, txNew.nVersion, chain().relayDustFee()))
+                    if (txout.nTokenId == DCT_ID{0} && IsDust(txout, txNew.nVersion, chain().relayDustFee()))
                     {
                         if (recipient.fSubtractFeeFromAmount && nFeeRet > 0)
                         {

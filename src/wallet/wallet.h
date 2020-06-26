@@ -335,7 +335,7 @@ struct CRecipient
 {
     CScript scriptPubKey;
     CAmount nAmount;
-    uint32_t nTokenId;
+    DCT_ID nTokenId;
     bool fSubtractFeeFromAmount;
 };
 
@@ -1073,11 +1073,11 @@ public:
     void ReacceptWalletTransactions(interfaces::Chain::Lock& locked_chain) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     void ResendWalletTransactions();
     struct Balance {
-        TAmounts m_mine_trusted{{0, 0}};           //!< Trusted, at depth=GetBalance.min_depth or more
-        TAmounts m_mine_untrusted_pending{{0, 0}}; //!< Untrusted, but in mempool (pending)
+        TAmounts m_mine_trusted{{DCT_ID{0}, 0}};           //!< Trusted, at depth=GetBalance.min_depth or more
+        TAmounts m_mine_untrusted_pending{{DCT_ID{0}, 0}}; //!< Untrusted, but in mempool (pending)
         CAmount m_mine_immature{0};          //!< Immature coinbases in the main chain
-        TAmounts m_watchonly_trusted{{0, 0}};
-        TAmounts m_watchonly_untrusted_pending{{0, 0}};
+        TAmounts m_watchonly_trusted{{DCT_ID{0}, 0}};
+        TAmounts m_watchonly_untrusted_pending{{DCT_ID{0}, 0}};
         CAmount m_watchonly_immature{0};
     };
     Balance GetBalance(int min_depth = 0, bool avoid_reuse = true) const;

@@ -117,7 +117,7 @@ Result CreateTotalBumpTransaction(const CWallet* wallet, const uint256& txid, co
     }
 
     // calculate the old fee and fee-rate
-    old_fee = wtx.GetDebit(ISMINE_SPENDABLE)[0] - wtx.tx->GetValueOut();
+    old_fee = wtx.GetDebit(ISMINE_SPENDABLE)[DCT_ID{0}] - wtx.tx->GetValueOut();
     CFeeRate nOldFeeRate(old_fee, txSize);
     // The wallet uses a conservative WALLET_INCREMENTAL_RELAY_FEE value to
     // future proof against changes to network wide policy for incremental relay
@@ -233,7 +233,7 @@ Result CreateRateBumpTransaction(CWallet* wallet, const uint256& txid, const CCo
     // Get the fee rate of the original transaction. This is calculated from
     // the tx fee/vsize, so it may have been rounded down. Add 1 satoshi to the
     // result.
-    old_fee = wtx.GetDebit(ISMINE_SPENDABLE)[0] - wtx.tx->GetValueOut();
+    old_fee = wtx.GetDebit(ISMINE_SPENDABLE)[DCT_ID{0}] - wtx.tx->GetValueOut();
     int64_t txSize = GetVirtualTransactionSize(*(wtx.tx));
     // Feerate of thing we are bumping
     CFeeRate feerate(old_fee, txSize);
