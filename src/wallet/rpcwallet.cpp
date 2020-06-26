@@ -179,12 +179,12 @@ static std::string LabelFromValue(const UniValue& value)
 static UniValue TokensToJSON(const TAmounts & amounts, bool with_tokens)
 {
     if (!with_tokens) {
-        return ValueFromAmount(amounts.find(0) == amounts.end() ? 0 : amounts.at(0));
+        return ValueFromAmount(amounts.find(DCT_ID{0}) == amounts.end() ? 0 : amounts.at(DCT_ID{0}));
     }
 
     UniValue result(UniValue::VOBJ);
     for (auto pair : amounts) {
-        result.pushKV(std::to_string(pair.first), ValueFromAmount(pair.second));
+        result.pushKV(pair.first.ToString(), ValueFromAmount(pair.second));
     }
     return result;
 }
@@ -329,7 +329,7 @@ static UniValue setlabel(const JSONRPCRequest& request)
 }
 
 
-static CTransactionRef SendMoney(interfaces::Chain::Lock& locked_chain, CWallet * const pwallet, const CTxDestination &address, CAmount nValue, uint32_t tokenId, bool fSubtractFeeFromAmount, const CCoinControl& coin_control, mapValue_t mapValue)
+static CTransactionRef SendMoney(interfaces::Chain::Lock& locked_chain, CWallet * const pwallet, const CTxDestination &address, CAmount nValue, DCT_ID tokenId, bool fSubtractFeeFromAmount, const CCoinControl& coin_control, mapValue_t mapValue)
 {
     TAmounts curBalance = pwallet->GetBalance(0, coin_control.m_avoid_address_reuse).m_mine_trusted;
 
@@ -337,7 +337,7 @@ static CTransactionRef SendMoney(interfaces::Chain::Lock& locked_chain, CWallet 
     if (nValue <= 0)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
 
-    if (nValue > curBalance[tokenId])
+    if (nValue > curBalance[DCT_ID{tokenId}])
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
 
     // Parse Defi address
@@ -348,11 +348,11 @@ static CTransactionRef SendMoney(interfaces::Chain::Lock& locked_chain, CWallet 
     std::string strError;
     std::vector<CRecipient> vecSend;
     int nChangePosRet = -1;
-    CRecipient recipient = {scriptPubKey, nValue, tokenId, tokenId == 0 ? fSubtractFeeFromAmount : false }; // turn off `fSubtractFeeFromAmount` for tokens
+    CRecipient recipient = {scriptPubKey, nValue, tokenId, tokenId == DCT_ID{0} ? fSubtractFeeFromAmount : false }; // turn off `fSubtractFeeFromAmount` for tokens
     vecSend.push_back(recipient);
     CTransactionRef tx;
     if (!pwallet->CreateTransaction(locked_chain, vecSend, tx, nFeeRequired, nChangePosRet, strError, coin_control)) {
-        if (!fSubtractFeeFromAmount && (tokenId == 0 ? nValue : 0) + nFeeRequired > curBalance[0])
+        if (!fSubtractFeeFromAmount && (tokenId == DCT_ID{0} ? nValue : 0) + nFeeRequired > curBalance[DCT_ID{0}])
             strError = strprintf("Error: This transaction requires a transaction fee of at least %s", FormatMoney(nFeeRequired));
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
     }
@@ -418,7 +418,7 @@ static UniValue sendtoaddress(const JSONRPCRequest& request)
     if (!IsValidDestination(dest)) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
     }
-    uint32_t tokenId;
+    DCT_ID tokenId;
     std::unique_ptr<CToken> token = pwallet->chain().existTokenGuessId(pair.first, tokenId);
     if (!token) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Defi token: ") + pair.first);
@@ -437,7 +437,7 @@ static UniValue sendtoaddress(const JSONRPCRequest& request)
         mapValue["to"] = request.params[3].get_str();
 
     bool fSubtractFeeFromAmount = false;
-    if (!request.params[4].isNull() && tokenId == 0) { // ignore fSubtractFeeFromAmount for tokens
+    if (!request.params[4].isNull() && tokenId == DCT_ID{0}) { // ignore fSubtractFeeFromAmount for tokens
         fSubtractFeeFromAmount = request.params[4].get_bool();
     }
 
@@ -941,7 +941,7 @@ static UniValue sendmany(const JSONRPCRequest& request)
         bool fSubtractFeeFromAmount = false;
         for (unsigned int idx = 0; idx < subtractFeeFromAmount.size(); idx++) {
             const UniValue& addr = subtractFeeFromAmount[idx];
-            if (addr.get_str() == name_ && token_dest.tokenId == 0)
+            if (addr.get_str() == name_ && token_dest.tokenId == DCT_ID{0})
                 fSubtractFeeFromAmount = true;
         }
 
@@ -1751,8 +1751,8 @@ static UniValue gettransaction(const JSONRPCRequest& request)
     const CWalletTx& wtx = it->second;
 
     /// @todo tokens: id == 0??
-    CAmount nCredit = wtx.GetCredit(*locked_chain, filter)[0]; /// @todo tokens: extend?
-    CAmount nDebit = wtx.GetDebit(filter)[0];                  /// @todo tokens: extend?
+    CAmount nCredit = wtx.GetCredit(*locked_chain, filter)[DCT_ID{0}]; /// @todo tokens: extend?
+    CAmount nDebit = wtx.GetDebit(filter)[DCT_ID{0}];                  /// @todo tokens: extend?
     CAmount nNet = nCredit - nDebit;
     CAmount nFee = (wtx.IsFromMe(filter) ? wtx.tx->GetValueOut() - nDebit : 0);
 
@@ -2952,7 +2952,7 @@ static UniValue listunspent(const JSONRPCRequest& request)
         cctl.m_min_depth = nMinDepth;
         cctl.m_max_depth = nMaxDepth;
         if (nOnlyTokensId >= 0) {
-            cctl.m_tokenFilter.insert(nOnlyTokensId);
+            cctl.m_tokenFilter.insert(DCT_ID{(uint32_t) nOnlyTokensId});
         }
         auto locked_chain = pwallet->chain().lock();
         LOCK(pwallet->cs_wallet);
@@ -3017,7 +3017,7 @@ static UniValue listunspent(const JSONRPCRequest& request)
 
         entry.pushKV("scriptPubKey", HexStr(scriptPubKey.begin(), scriptPubKey.end()));
         entry.pushKV("amount", ValueFromAmount(out.tx->tx->vout[out.i].nValue));
-        entry.pushKV("tokenId", (int) out.tx->tx->vout[out.i].nTokenId);
+        entry.pushKV("tokenId", out.tx->tx->vout[out.i].nTokenId.ToString());
         entry.pushKV("confirmations", out.nDepth);
         entry.pushKV("spendable", out.fSpendable);
         entry.pushKV("solvable", out.fSolvable);

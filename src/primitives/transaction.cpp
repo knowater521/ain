@@ -48,20 +48,20 @@ bool CTxOut::SERIALIZE_FORCED_TO_OLD_IN_TESTS = false;
 CTxOut::CTxOut(const CAmount& nValueIn, CScript scriptPubKeyIn)
 {
     nValue = nValueIn;
-    scriptPubKey = scriptPubKeyIn;
-    nTokenId = 0;
+    scriptPubKey = std::move(scriptPubKeyIn);
+    nTokenId = DCT_ID{0};
 }
 
-CTxOut::CTxOut(const CAmount & nValueIn, CScript scriptPubKeyIn, uint32_t nTokenIdIn)
+CTxOut::CTxOut(const CAmount & nValueIn, CScript scriptPubKeyIn, DCT_ID nTokenIdIn)
 {
     nValue = nValueIn;
-    scriptPubKey = scriptPubKeyIn;
+    scriptPubKey = std::move(scriptPubKeyIn);
     nTokenId = nTokenIdIn;
 }
 
 std::string CTxOut::ToString() const
 {
-    return strprintf("CTxOut(nValue=%d.%08d, nTokenId=%d, scriptPubKey=%s)", nValue / COIN, nValue % COIN, nTokenId, HexStr(scriptPubKey).substr(0, 30));
+    return strprintf("CTxOut(nValue=%d.%08d, nTokenId=%s, scriptPubKey=%s)", nValue / COIN, nValue % COIN, nTokenId.ToString(), HexStr(scriptPubKey).substr(0, 30));
 }
 
 CMutableTransaction::CMutableTransaction() : nVersion(CTransaction::CURRENT_VERSION), nLockTime(0) {}
@@ -90,7 +90,7 @@ CTransaction::CTransaction() : vin(), vout(), nVersion(CTransaction::CURRENT_VER
 CTransaction::CTransaction(const CMutableTransaction& tx) : vin(tx.vin), vout(tx.vout), nVersion(tx.nVersion), nLockTime(tx.nLockTime), hash{ComputeHash()}, m_witness_hash{ComputeWitnessHash()} {}
 CTransaction::CTransaction(CMutableTransaction&& tx) : vin(std::move(tx.vin)), vout(std::move(tx.vout)), nVersion(tx.nVersion), nLockTime(tx.nLockTime), hash{ComputeHash()}, m_witness_hash{ComputeWitnessHash()} {}
 
-CAmount CTransaction::GetValueOut(uint32_t nTokenId) const
+CAmount CTransaction::GetValueOut(DCT_ID nTokenId) const
 {
     CAmount nValueOut = 0;
     for (const auto& tx_out : vout) {
