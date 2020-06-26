@@ -303,6 +303,10 @@ public:
         return MakeUnique<CFlushableStorageKVIterator>(db.NewIterator(), changed);
     }
 
+    MapKV& GetRaw() {
+        return changed;
+    }
+
 private:
     CStorageKV& db;
     MapKV changed;
