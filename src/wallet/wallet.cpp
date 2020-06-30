@@ -3013,7 +3013,7 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
 
     const OutputType change_type = TransactionChangeType(coin_control.m_change_type ? *coin_control.m_change_type : m_default_change_type, vecSend);
 
-    std::map<DCT_ID, ReserveDestination> tokensreservedest;
+    std::map<DCT_ID, std::unique_ptr<ReserveDestination> > tokensreservedest;
     std::set<CInputCoin> tokenCoins;
     {
         auto locked_chain = chain().lock();
@@ -3029,7 +3029,7 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
 
             AvailableCoins(*locked_chain, vAvailableCoins, true, &ccSingleToken, 1, MAX_MONEY, MAX_MONEY, 0);
 
-            tokensreservedest.emplace(tokenId, this);
+            tokensreservedest.emplace(tokenId, std::unique_ptr<ReserveDestination>(new ReserveDestination(this)));  // used dynamic here due to strange bug with direct emplacement under mac
             CScript scriptChange;
             // coin control: send change to custom address
             if (!boost::get<CNoDestination>(&coin_control.destChange)) {
@@ -3041,7 +3041,7 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
                     return false;
                 }
                 CTxDestination dest;
-                if (!tokensreservedest.at(tokenId).GetReservedDestination(change_type, dest, true))
+                if (!tokensreservedest.at(tokenId)->GetReservedDestination(change_type, dest, true))
                 {
                     strFailReason = "Keypool ran out, please call keypoolrefill first";
                     return false;
@@ -3400,7 +3400,7 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
     // accidental re-use.
     reservedest.KeepDestination();
     for (auto && pair : tokensreservedest) {
-        pair.second.KeepDestination();
+        pair.second->KeepDestination();
     }
 
     WalletLogPrintf("Fee Calculation: Fee:%d Bytes:%u Needed:%d Tgt:%d (requested %d) Reason:\"%s\" Decay %.5f: Estimation: (%g - %g) %.2f%% %.1f/(%.1f %d mem %.1f out) Fail: (%g - %g) %.2f%% %.1f/(%.1f %d mem %.1f out)\n",
