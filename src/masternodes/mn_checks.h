@@ -18,9 +18,6 @@ class CCoinsViewCache;
 class CCustomCSView;
 
 static const std::vector<unsigned char> DfTxMarker = {'D', 'f', 'T', 'x'};  // 44665478
-/// @todo refactor it to unify txs!!! (need to restart blockchain)
-static const std::vector<unsigned char> DfCriminalTxMarker = {'D', 'f', 'C', 'r'};
-static const std::vector<unsigned char> DfAnchorFinalizeTxMarker = {'D', 'f', 'A', 'f'};
 
 enum CustomTxErrCodes : uint32_t {
     NotSpecified = 0,
@@ -94,10 +91,6 @@ Res ApplyAccountToUtxosTx(CCustomCSView & mnview, CCoinsViewCache const & coins,
 Res ApplyAccountToAccountTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, std::vector<unsigned char> const & metadata);
 
 bool IsMempooledCustomTxCreate(const CTxMemPool& pool, const uint256 & txid);
-
-//! Checks if given tx is probably one of 'CustomTx', returns tx type and serialized metadata in 'data'
-bool IsCriminalProofTx(CTransaction const & tx, std::vector<unsigned char> & metadata);
-bool IsAnchorRewardTx(CTransaction const & tx, std::vector<unsigned char> & metadata);
 
 // @todo refactor header functions
 /*
