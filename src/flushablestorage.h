@@ -8,6 +8,7 @@
 #include <dbwrapper.h>
 #include <boost/optional.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread.hpp>
 
 using TBytes = std::vector<unsigned char>;
 using MapKV = std::map<TBytes, boost::optional<TBytes>>;
