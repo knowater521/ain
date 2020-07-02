@@ -572,7 +572,7 @@ public:
     bool IsFromMe(const isminefilter& filter) const
     {
         TAmounts amounts = GetDebit(filter);
-        return amounts.size() > 1 || amounts.begin()->second > 0; // non-zero tokens, or possible non-zero `amounts[0]`
+        return amounts.size() > 0 && (amounts.size() > 1 || amounts.begin()->second > 0); // non-zero tokens, or possible non-zero `amounts[0]`
     }
 
     // True if only scriptSigs are different

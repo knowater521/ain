@@ -1546,7 +1546,7 @@ bool CWallet::IsMine(const CTransaction& tx) const
 bool CWallet::IsFromMe(const CTransaction& tx) const
 {
     TAmounts amounts = GetDebit(tx, ISMINE_ALL);
-    return amounts.size() > 1 || amounts.begin()->second > 0; // non-zero tokens, or possible non-zero `amounts[0]`
+    return amounts.size() > 0 && (amounts.size() > 1 || amounts.begin()->second > 0); // non-zero tokens, or possible non-zero `amounts[0]`
 }
 
 TAmounts CWallet::GetDebit(const CTransaction& tx, const isminefilter& filter) const
