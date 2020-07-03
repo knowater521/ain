@@ -77,6 +77,7 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName)
 
     gArgs.ForceSetArg("-masternode_operator", "mps7BdmwEF2vQ9DREDyNPibqsuSRZ8LuwQ"); // matches with [1] masternode from regtest chainparams (and with testMasternodeKeys.begin())
     gArgs.ForceSetArg("-spv_testnet", "1");
+    CTxOut::SERIALIZE_FORCED_TO_OLD_IN_TESTS = true;
     fCriminals = true;
     fIsFakeNet = true;
 }
