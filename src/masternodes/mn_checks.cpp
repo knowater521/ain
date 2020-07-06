@@ -103,6 +103,17 @@ bool HasTokenAuth(CTransaction const & tx, CCoinsViewCache const & coins, uint25
     return HasAuth(tx, coins, auth.out.scriptPubKey);
 }
 
+bool HasFoundationAuth(CTransaction const & tx, CCoinsViewCache const & coins, Consensus::Params const & consensusParams)
+{
+    for (auto input : tx.vin) {
+        const Coin& coin = coins.AccessCoin(input.prevout);
+        assert(!coin.IsSpent());
+        if (consensusParams.foundationMembers.find(coin.out.scriptPubKey) != consensusParams.foundationMembers.end())
+            return true;
+    }
+    return false;
+}
+
 // @todo get rid of "is check" argument and logging inside of this function
 Res ApplyCustomTx(CCustomCSView & base_mnview, CCoinsViewCache const & coins, CTransaction const & tx, Consensus::Params const & consensusParams, uint32_t height, bool isCheck)
 {
