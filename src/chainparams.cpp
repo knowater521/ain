@@ -185,8 +185,9 @@ public:
         bech32_hrp = "df";
 
         // (!) after prefixes set
-        consensus.foundationAddress = DecodeDestination("dZcHjYhKtEM88TtZLjp314H2xZjkztXtRc", *this);
+        consensus.foundationShareScript = GetScriptForDestination(DecodeDestination("dZcHjYhKtEM88TtZLjp314H2xZjkztXtRc", *this));
         consensus.foundationShare = 10;
+        consensus.foundationMembers.clear();
 
         // owner base58, operator base58
         vMasternodes.push_back({"8PuErAcazqccCVzRcc8vJ3wFaZGm4vFbLe", "8J846CKFF83Jcj5m4EReJmxiaJ6Jy1Y6Ea"});
@@ -344,8 +345,9 @@ public:
         bech32_hrp = "tf";
 
         // (!) after prefixes set
-        consensus.foundationAddress = DecodeDestination("7Q2nZCcKnxiRiHSNQtLB27RA5efxm2cE7w", *this);
+        consensus.foundationShareScript = GetScriptForDestination(DecodeDestination("7Q2nZCcKnxiRiHSNQtLB27RA5efxm2cE7w", *this));
         consensus.foundationShare = 10;
+        consensus.foundationMembers.clear();
 
         // owner base58, operator base58
         vMasternodes.push_back({"7LMorkhKTDjbES6DfRxX2RiNMbeemUkxmp", "7KEu9JMKCx6aJ9wyg138W3p42rjg19DR5D"});
@@ -469,8 +471,12 @@ public:
         bech32_hrp = "tf";
 
         // (!) after prefixes set
-        consensus.foundationAddress = DecodeDestination("7Q2nZCcKnxiRiHSNQtLB27RA5efxm2cE7w", *this);
+        consensus.foundationShareScript = GetScriptForDestination(DecodeDestination("7Q2nZCcKnxiRiHSNQtLB27RA5efxm2cE7w", *this));
         consensus.foundationShare = 10;
+
+        // now it is for devnet and regtest only, 2 first of genesis MNs acts as foundation members
+        consensus.foundationMembers.emplace(GetScriptForDestination(DecodeDestination("7M3g9CSERjLdXisE5pv2qryDbURUj9Vpi1", *this)));
+        consensus.foundationMembers.emplace(GetScriptForDestination(DecodeDestination("7L29itepC13pgho1X2y7mcuf4WjkBi7x2w", *this)));
 
         // owner base58, operator base58
         vMasternodes.push_back({"7M3g9CSERjLdXisE5pv2qryDbURUj9Vpi1", "7Grgx69MZJ4wDKRx1bBxLqTnU9T3quKW7n"});
@@ -594,8 +600,14 @@ public:
         bech32_hrp = "bcrt";
 
         // (!) after prefixes set
-        consensus.foundationAddress = CNoDestination();
+        consensus.foundationShareScript.clear();
         consensus.foundationShare = 0;
+
+        // now it is for devnet and regtest only, 2 first and 2 last of genesis MNs acts as foundation members
+        consensus.foundationMembers.emplace(GetScriptForDestination(DecodeDestination("mwsZw8nF7pKxWH8eoKL9tPxTpaFkz7QeLU", *this)));
+        consensus.foundationMembers.emplace(GetScriptForDestination(DecodeDestination("msER9bmJjyEemRpQoS8YYVL21VyZZrSgQ7", *this)));
+        consensus.foundationMembers.emplace(GetScriptForDestination(DecodeDestination("bcrt1qyrfrpadwgw7p5eh3e9h3jmu4kwlz4prx73cqny", *this)));
+        consensus.foundationMembers.emplace(GetScriptForDestination(DecodeDestination("bcrt1qyeuu9rvq8a67j86pzvh5897afdmdjpyankp4mu", *this)));
 
         // owner base58, operator base58
         vMasternodes.push_back({"mwsZw8nF7pKxWH8eoKL9tPxTpaFkz7QeLU", "mswsMVsyGMj1FzDMbbxw2QW3KvQAv2FKiy"});

@@ -241,10 +241,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
     // Pinch off foundation share
     CAmount foundationsReward = coinbaseTx.vout[0].nValue * chainparams.GetConsensus().foundationShare / 100;
-    if (IsValidDestination(chainparams.GetConsensus().foundationAddress) && chainparams.GetConsensus().foundationShare != 0) {
+    if (!chainparams.GetConsensus().foundationShareScript.empty() && chainparams.GetConsensus().foundationShare != 0) {
         if (pcustomcsview->GetFoundationsDebt() < foundationsReward) {
             coinbaseTx.vout.resize(2);
-            coinbaseTx.vout[1].scriptPubKey = GetScriptForDestination(chainparams.GetConsensus().foundationAddress);
+            coinbaseTx.vout[1].scriptPubKey = chainparams.GetConsensus().foundationShareScript;
             coinbaseTx.vout[1].nValue = foundationsReward - pcustomcsview->GetFoundationsDebt();
             coinbaseTx.vout[0].nValue -= coinbaseTx.vout[1].nValue;
         } else {
