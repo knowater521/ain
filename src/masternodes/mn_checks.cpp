@@ -362,7 +362,7 @@ Res ApplyMatchOrdersTx(CCustomCSView & mnview, CTransaction const & tx, std::vec
     if (!ss.empty()) {
         return Res::Err("Matching tx deserialization failed: excess %d bytes", ss.size());
     }
-    const auto base = tfm::format("Matching of orders %s/%s", match.aliceOrderTx.ToString(), match.carolOrderTx.ToString());
+    const auto base = strprintf("Matching of orders %s/%s", match.aliceOrderTx.ToString(), match.carolOrderTx.ToString());
 
     // calculate the math of matching
     const auto resV = GetMatchOrdersInfo(mnview, match);
