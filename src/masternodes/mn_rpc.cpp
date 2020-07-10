@@ -1311,7 +1311,7 @@ UniValue accountToJSON(CScript const& owner, CTokenAmount const& amount, bool ve
     // encode CScript into JSON
     UniValue ownerObj(UniValue::VOBJ);
     ScriptPubKeyToUniv(owner, ownerObj, true);
-    if (!verbose) { // trim info
+    if (!verbose) { // cut info
         if (ownerObj["addresses"].isArray() && !ownerObj["addresses"].get_array().empty()) {
             ownerObj = ownerObj["addresses"].get_array().getValues()[0];
         } else {
