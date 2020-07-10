@@ -8,6 +8,8 @@
 #include <script/standard.h> // CTxDestination
 
 #include <map>
+#include <masternodes/res.h>
+#include "request.h"
 
 class FillableSigningProvider;
 class UniValue;
@@ -20,6 +22,11 @@ class Chain;
 }
 
 std::pair<std::string, std::string> SplitTokenAddress(std::string const & output);
+
+ResVal<std::pair<CAmount, std::string>> ParseTokenAmount(std::string const & tokenAmount);
+ResVal<CTokenAmount> GuessTokenAmount(std::string const & tokenAmount, const interfaces::Chain & chain);
+
+std::function<void(std::string)> JSONRPCErrorThrower(int code, const std::string& prefix);
 
 struct TokenDestination
 {
