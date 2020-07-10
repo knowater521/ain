@@ -9,7 +9,7 @@
 
 #include <map>
 #include <masternodes/res.h>
-#include "request.h"
+#include <rpc/request.h>
 
 class FillableSigningProvider;
 class UniValue;
