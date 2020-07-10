@@ -23,6 +23,12 @@
 
 #include <string>
 
+std::function<void(std::string)> JSONRPCErrorThrower(int code, const std::string& prefix) {
+    return [=](const std::string& msg) {
+        throw JSONRPCError(code, prefix + ": " + msg);
+    };
+}
+
 std::pair<std::string, std::string> SplitTokenAddress(std::string const & output)
 {
     const unsigned char TOKEN_SPLITTER = '@';
@@ -30,6 +36,40 @@ std::pair<std::string, std::string> SplitTokenAddress(std::string const & output
     std::string address = (pos != std::string::npos) ? output.substr(pos+1) : output;
     std::string token_str = (pos != std::string::npos) ? output.substr(0, pos) : "";
     return { token_str, address };
+}
+
+static std::pair<std::string, std::string> SplitAmount(std::string const & tokenAmount)
+{
+    return SplitTokenAddress(tokenAmount);
+}
+
+ResVal<std::pair<CAmount, std::string>> ParseTokenAmount(std::string const & tokenAmount) {
+    const auto strs = SplitAmount(tokenAmount);
+
+    CAmount amount;
+    if (!ParseFixedPoint(strs.first, 8, &amount))
+        return Res::Err("Invalid amount");
+    return {{amount, strs.second}, Res::Ok()};
+}
+
+ResVal<CTokenAmount> GuessTokenAmount(std::string const & tokenAmount, const interfaces::Chain & chain) {
+    const auto parsed = ParseTokenAmount(tokenAmount);
+    if (!parsed.ok) {
+        return {parsed.res()};
+    }
+    DCT_ID tokenId;
+    try {
+        // try to parse it as a number, in a case DCT_ID was written
+        tokenId.v = (uint32_t) std::stoul(parsed.val->second);
+        return {{tokenId, parsed.val->first}, Res::Ok()};
+    } catch (...) {
+        // assuming it's token symbol, read DCT_ID from DB
+        std::unique_ptr<CToken> token = chain.existTokenGuessId(parsed.val->second, tokenId);
+        if (!token) {
+            return Res::Err("Invalid Defi token: %s", parsed.val->second);
+        }
+        return {{tokenId, parsed.val->first}, Res::Ok()};
+    }
 }
 
 TokenDestination::TokenDestination(const std::string & output, const interfaces::Chain & chain) {
