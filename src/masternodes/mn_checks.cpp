@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <masternodes/mn_checks.h>
+#include <masternodes/orders_matching.h>
 #include <masternodes/res.h>
 #include <masternodes/balances.h>
 
@@ -136,6 +137,9 @@ Res ApplyCustomTx(CCustomCSView & base_mnview, CCoinsViewCache const & coins, CT
                 break;
             case CustomTxType::DestroyOrder:
                 res = ApplyDestroyOrderTx(mnview, coins, tx, height, metadata);
+                break;
+            case CustomTxType::MatchOrders:
+                res = ApplyMatchOrdersTx(mnview, tx, metadata);
                 break;
             case CustomTxType::UtxosToAccount:
                 res = ApplyUtxosToAccountTx(mnview, tx, metadata);
@@ -323,6 +327,76 @@ Res ApplyDestroyOrderTx(CCustomCSView & mnview, CCoinsViewCache const & coins, C
     }
 
     res = mnview.DelOrder(orderTx);
+    if (!res.ok) {
+        return Res::Err("%s: %s", base, res.msg);
+    }
+    return Res::Ok(base);
+}
+
+ResVal<std::pair<OrdersMatching, std::pair<COrder, COrder>>> GetMatchOrdersInfo(CCustomCSView const & mnview, CMatchOrdersMessage const& match)
+{
+    // read orders
+    const auto aliceOrder = mnview.GetOrder(match.aliceOrderTx);
+    if (!aliceOrder) {
+        return Res::Err("Alice's order not found");
+    }
+    const auto carolOrder = mnview.GetOrder(match.carolOrderTx);
+    if (!carolOrder) {
+        return Res::Err("Carol's order not found");
+    }
+
+    // calculate the math of matching
+    auto receipt = OrdersMatching::Calculate(*aliceOrder, *carolOrder);
+    if (!receipt.ok) {
+        return receipt.res();
+    }
+    return {{*receipt.val, {*aliceOrder, *carolOrder}}, Res::Ok()};
+}
+
+Res ApplyMatchOrdersTx(CCustomCSView & mnview, CTransaction const & tx, std::vector<unsigned char> const & metadata)
+{
+    // deserialize
+    CMatchOrdersMessage match;
+    CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
+    ss >> match;
+    if (!ss.empty()) {
+        return Res::Err("Matching tx deserialization failed: excess %d bytes", ss.size());
+    }
+    const auto base = tfm::format("Matching of orders %s/%s", match.aliceOrderTx.ToString(), match.carolOrderTx.ToString());
+
+    // calculate the math of matching
+    const auto resV = GetMatchOrdersInfo(mnview, match);
+    if (!resV.ok) {
+        return Res::Err("%s: %s", base, resV.msg);
+    }
+    auto& receipt = resV.val->first;
+    const auto& aliceOrder = resV.val->second.first;
+    const auto& carolOrder = resV.val->second.second;
+
+    // increase balances
+    mnview.AddBalance(aliceOrder.owner, receipt.alice.take);
+    mnview.AddBalance(carolOrder.owner, receipt.carol.take);
+    mnview.AddBalances(match.matcher, receipt.matcherTake);
+
+    // apply changes to orders in memory
+    const auto newAliceOrder = OrdersMatching::ApplyOrderDiff(aliceOrder, receipt.alice);
+    const auto newCarolOrder = OrdersMatching::ApplyOrderDiff(carolOrder, receipt.carol);
+
+    // write order changes in DB
+    Res res = Res::Ok();
+    if (newAliceOrder) {
+        res = mnview.SetOrder(match.aliceOrderTx, *newAliceOrder);
+    } else {
+        res = mnview.DelOrder(match.aliceOrderTx);
+    }
+    if (!res.ok) {
+        return Res::Err("%s: %s", base, res.msg);
+    }
+    if (newCarolOrder) {
+        res = mnview.SetOrder(match.carolOrderTx, *newCarolOrder);
+    } else {
+        res = mnview.DelOrder(match.carolOrderTx);
+    }
     if (!res.ok) {
         return Res::Err("%s: %s", base, res.msg);
     }
