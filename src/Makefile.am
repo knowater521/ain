@@ -363,6 +363,7 @@ libdefi_server_a_SOURCES = \
   masternodes/mn_checks.cpp \
   masternodes/mn_rpc.cpp \
   masternodes/orders.cpp \
+  masternodes/orders_matching.cpp \
   masternodes/tokens.cpp \
   masternodes/undos.cpp \
   miner.cpp \
