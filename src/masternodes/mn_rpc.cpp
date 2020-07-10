@@ -1190,6 +1190,134 @@ UniValue destroyorder(const JSONRPCRequest& request) {
     return signsend(rawTx, request, pwallet)->GetHash().GetHex();
 }
 
+UniValue matchorders(const JSONRPCRequest& request) {
+    CWallet* const pwallet = GetWallet(request);
+
+    auto h = RPCHelpMan{"matchorders",
+               "\nCreates (and submits to local node and network) an order marching transaction with given metadata.\n"
+               "The first optional argument (may be empty array) is an array of specific UTXOs to spend." +
+               HelpRequiringPassphrase(pwallet) + "\n",
+               {
+                       {"inputs", RPCArg::Type::ARR, RPCArg::Optional::OMITTED_NAMED_ARG,
+                        "A json array of json objects",
+                        {
+                                {"", RPCArg::Type::OBJ, RPCArg::Optional::OMITTED, "",
+                                 {
+                                         {"txid", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The transaction id"},
+                                         {"vout", RPCArg::Type::NUM, RPCArg::Optional::NO, "The output number"},
+                                 },
+                                },
+                        },
+                       },
+                       {"order_alice", RPCArg::Type::STR_HEX, RPCArg::Optional::NO,
+                        "Txid of the order transaction to match"},
+                       {"order_carol", RPCArg::Type::STR_HEX, RPCArg::Optional::NO,
+                        "Txid of the order transaction to match"},
+                       {"matcher", RPCArg::Type::STR, RPCArg::Optional::NO,
+                        "Any valid destination which will take marching rewards"},
+               },
+               RPCResult{
+                       "\"hex\"                  (string) The hex-encoded raw transaction with signature(s)\n"
+               },
+               RPCExamples{
+                       HelpExampleCli("matchorders", "[] matcher_address order1_txid "
+                                                         "order2_txid")
+               },
+    };
+    h.Check(request);
+    if (request.params.size() < 4) {
+        throw std::runtime_error(h.ToString());
+    }
+
+    if (pwallet->chain().isInitialBlockDownload()) {
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Cannot create transactions while still in Initial Block Download");
+    }
+
+    RPCTypeCheck(request.params, {UniValue::VARR, UniValue::VSTR, UniValue::VSTR, UniValue::VSTR}, false);
+
+    // decode params
+    CMatchOrdersMessage msg{};
+    msg.aliceOrderTx = ParseHashV(request.params[1], "order_alice");
+    msg.carolOrderTx = ParseHashV(request.params[2], "order_carol");
+    msg.matcher = DecodeScript(request.params[3].get_str());
+
+    // encode
+    CDataStream markedMetadata(DfTxMarker, SER_NETWORK, PROTOCOL_VERSION);
+    markedMetadata << static_cast<unsigned char>(CustomTxType::MatchOrders)
+                   << msg;
+    CScript scriptMeta;
+    scriptMeta << OP_RETURN << ToByteVector(markedMetadata);
+
+    CMutableTransaction rawTx;
+    rawTx.vout.push_back(CTxOut(0, scriptMeta));
+
+    // fund
+    rawTx = fund(rawTx, request, pwallet);
+
+    // check execution
+    {
+        LOCK(cs_main);
+        CCustomCSView mnview_dummy(*pcustomcsview); // don't write into actual DB
+        const auto res = ApplyMatchOrdersTx(mnview_dummy, CTransaction(rawTx),
+                                            ToByteVector(CDataStream{SER_NETWORK, PROTOCOL_VERSION, msg}));
+        if (!res.ok) {
+            throw JSONRPCError(RPC_INVALID_REQUEST, "Execution test failed:\n" + res.msg);
+        }
+    }
+
+    return signsend(rawTx, request, pwallet)->GetHash().GetHex();
+}
+
+UniValue matchordersinfo(const JSONRPCRequest& request) {
+    RPCHelpMan{"matchordersinfo",
+               "\nReturns estimation of orders matching outcome.\n",
+               {
+                       {"order_alice", RPCArg::Type::STR_HEX, RPCArg::Optional::NO,
+                        "Txid of the order transaction to match"},
+                       {"order_carol", RPCArg::Type::STR_HEX, RPCArg::Optional::NO,
+                        "Txid of the order transaction to match"},
+               },
+               RPCResult{
+                       "{...}     (array) Json object with matching information\n"
+               },
+               RPCExamples{
+                       HelpExampleCli("matchordersinfo", "order1_txid "
+                                                  "order2_txid")
+               },
+    }.Check(request);
+
+    const uint256 order_alice = ParseHashV(request.params[0], "order_alice");
+    const uint256 order_carol = ParseHashV(request.params[1], "order_carol");
+
+    // calculate the math of matching
+    const auto resV = GetMatchOrdersInfo(*pcustomcsview, CMatchOrdersMessage{order_alice, order_carol, CScript{}});
+    if (!resV.ok) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Order wasn't matched: " + resV.msg);
+    }
+
+    // receipt to JSON
+    auto& receipt = resV.val->first;
+    UniValue ret(UniValue::VOBJ);
+    UniValue matcherTake(UniValue::VARR);
+    for (const auto& kv : receipt.matcherTake.balances) {
+        matcherTake.push_back(CTokenAmount{kv.first, kv.second}.ToString());
+    }
+    UniValue alice(UniValue::VOBJ);
+    alice.pushKV("take", receipt.alice.take.ToString());
+    alice.pushKV("give", receipt.alice.give.ToString());
+    alice.pushKV("premiumGive", receipt.alice.premiumGive.ToString());
+    UniValue carol(UniValue::VOBJ);
+    carol.pushKV("take", receipt.carol.take.ToString());
+    carol.pushKV("give", receipt.carol.give.ToString());
+    carol.pushKV("premiumGive", receipt.carol.premiumGive.ToString());
+
+    ret.pushKV("matcherTake", matcherTake);
+    ret.pushKV("alice", alice);
+    ret.pushKV("carol", carol);
+
+    return ret;
+}
+
 UniValue listorders(const JSONRPCRequest& request) {
     RPCHelpMan{"listorders",
                "\nReturns information about orders.\n",
@@ -1768,8 +1896,10 @@ static const CRPCCommand commands[] =
                 {"tokens",      "minttokens",         &minttokens,         {"inputs", "symbol", "amounts"}},
                 {"dex",         "createorder",        &createorder,        {"inputs", "metadata"}},
                 {"dex",         "destroyorder",       &destroyorder,       {"inputs", "order_txid", "owner_address"}},
+                {"dex",         "matchorders",        &matchorders,        {"inputs", "matcher", "alice", "carol"}},
                 {"dex",         "listorders",         &listorders,         {"pagination", "verbose"}},
                 {"dex",         "getorder",           &getorder,           {"txid"}},
+                {"dex",         "matchordersinfo",    &matchordersinfo,    {"alice", "carol"}},
                 {"accounts",    "listaccounts",       &listaccounts,       {"pagination", "verbose"}},
                 {"accounts",    "getaccount",         &getaccount,         {"owner", "pagination"}},
                 {"accounts",    "utxostoaccount",     &utxostoaccount,     {"inputs", "amounts"}},
