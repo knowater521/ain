@@ -2,14 +2,14 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DEFI_ORDER_MATCHING_H
-#define DEFI_ORDER_MATCHING_H
+#ifndef DEFI_MASTERNODES_ORDERS_MATCHING_H
+#define DEFI_MASTERNODES_ORDERS_MATCHING_H
 
 #include <boost/optional.hpp>
 #include <amount.h>
+#include <masternodes/balances.h>
 #include <masternodes/order.h>
 #include <masternodes/res.h>
-#include "balances.h"
 
 struct OrdersMatching {
     struct OrderDiff {
@@ -36,4 +36,4 @@ struct OrdersMatching {
     CBalances matcherTake; // all matcher income, including premiums
 };
 
-#endif //DEFI_ORDER_MATCHING_H
+#endif //DEFI_ORDERS_MATCHING_H

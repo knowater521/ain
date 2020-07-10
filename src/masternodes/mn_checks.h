@@ -7,9 +7,9 @@
 
 #include <consensus/params.h>
 #include <masternodes/masternodes.h>
+#include <masternodes/orders_matching.h>
 #include <vector>
 #include <cstring>
-#include "orders_matching.h"
 
 class CBlock;
 class CTransaction;
