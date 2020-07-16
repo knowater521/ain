@@ -67,14 +67,11 @@ struct PSBTInput
         // If there is a non-witness utxo, then don't add the witness one.
         if (non_witness_utxo) {
             SerializeToVector(s, PSBT_IN_NON_WITNESS_UTXO);
-            /// @todo tokens: check if tx version was properly assumed!
-            OverrideStream<Stream> os(&s, s.GetType(), s.GetVersion() | SERIALIZE_TRANSACTION_NO_WITNESS | (non_witness_utxo->nVersion < CTransaction::TOKENS_MIN_VERSION ? SERIALIZE_TRANSACTION_NO_TOKENS : 0));
+            OverrideStream<Stream> os(&s, s.GetType(), s.GetVersion() | SERIALIZE_TRANSACTION_NO_WITNESS);
             SerializeToVector(os, non_witness_utxo);
         } else if (!witness_utxo.IsNull()) {
             SerializeToVector(s, PSBT_IN_WITNESS_UTXO);
-            /// @todo tokens: override with correct version when witness_utxo (and wallet's Coin's tokens) versioning implemented!
-            OverrideStream<Stream> os(&s, s.GetType(), s.GetVersion() | SERIALIZE_TRANSACTION_NO_TOKENS);
-            SerializeToVector(os, witness_utxo);
+            SerializeToVector(s, witness_utxo);
         }
 
         if (final_script_sig.empty() && final_script_witness.IsNull()) {
@@ -157,7 +154,7 @@ struct PSBTInput
                     }
                     // Set the stream to unserialize with witness since this is always a valid network transaction
                     OverrideStream<Stream> os(&s, s.GetType(), s.GetVersion() & ~SERIALIZE_TRANSACTION_NO_WITNESS);
-                    UnserializeFromVector(os, non_witness_utxo); /// @todo tokens: check if tx version was properly assumed!
+                    UnserializeFromVector(os, non_witness_utxo);
                     break;
                 }
                 case PSBT_IN_WITNESS_UTXO:
@@ -166,11 +163,7 @@ struct PSBTInput
                     } else if (key.size() != 1) {
                         throw std::ios_base::failure("Witness utxo key is more than one byte type");
                     }
-                    /// @todo tokens: override with correct version when witness_utxo (and wallet's Coin's tokens) versioning implemented!
-                    {
-                        OverrideStream<Stream> os(&s, s.GetType(), s.GetVersion() | SERIALIZE_TRANSACTION_NO_TOKENS);
-                        UnserializeFromVector(os, witness_utxo);
-                    }
+                    UnserializeFromVector(s, witness_utxo);
                     break;
                 case PSBT_IN_PARTIAL_SIG:
                 {

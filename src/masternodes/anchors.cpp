@@ -159,7 +159,7 @@ bool CAnchorAuthIndex::ValidateAuth(const CAnchorAuthIndex::Auth & auth) const
         return error("%s: Can't get block from height: %d !", __func__, auth.height);
     }
 
-    if (auth.nextTeam != pcustomcsview->CalcNextTeam(block->stakeModifier)) {
+    if (auth.nextTeam != pmasternodesview->CalcNextTeam(block->stakeModifier)) {
         return error("%s: Wrong nextTeam for auth %s!!!", __func__, auth.GetHash().ToString());
     }
 
@@ -181,7 +181,7 @@ bool CAnchorAuthIndex::AddAuth(const CAnchorAuthIndex::Auth & auth)
     return auths.insert(auth).second;
 }
 
-uint32_t GetMinAnchorQuorum(CCustomCSView::CTeam const & team)
+uint32_t GetMinAnchorQuorum(CMasternodesView::CTeam const & team)
 {
     if (Params().NetworkIDString() == "regtest") {
         return gArgs.GetArg("-anchorquorum", 1);
@@ -352,7 +352,7 @@ bool CAnchorIndex::DeleteAnchorByBtcTx(const uint256 & btcTxHash)
     return false;
 }
 
-CCustomCSView::CTeam CAnchorIndex::GetNextTeam(const uint256 & btcPrevTx) const
+CMasternodesView::CTeam CAnchorIndex::GetNextTeam(const uint256 & btcPrevTx) const
 {
     AssertLockHeld(cs_main);
 
@@ -362,12 +362,12 @@ CCustomCSView::CTeam CAnchorIndex::GetNextTeam(const uint256 & btcPrevTx) const
     AnchorRec const * prev = ExistAnchorByTx(btcPrevTx);
     if (!prev) {
         LogPrintf("Can't get previous anchor with btc hash %s\n",  btcPrevTx.ToString());
-        return CCustomCSView::CTeam{};
+        return CMasternodesView::CTeam{};
     }
     return prev->anchor.nextTeam;
 }
 
-CCustomCSView::CTeam CAnchorIndex::GetCurrentTeam(const CAnchorIndex::AnchorRec * anchor) const
+CMasternodesView::CTeam CAnchorIndex::GetCurrentTeam(const CAnchorIndex::AnchorRec * anchor) const
 {
     AssertLockHeld(cs_main);
 
@@ -403,15 +403,22 @@ CAnchorIndex::UnrewardedResult CAnchorIndex::GetUnrewarded() const
         confirmed.insert(it->txHash);
     }
 
-    // find unrewarded
-    for (auto && it = confirmed.begin(); it != confirmed.end(); /* no advance */) {
-        if (pcustomcsview->GetRewardForAnchor(*it))
-            it = confirmed.erase(it);
-        else
-            it++;
-    }
+    // custom comparator for set_difference
+    struct cmp {
+        bool operator()(uint256 const & a, std::pair<uint256 const, uint256> const & b) const {
+            return a < b.first;
+        }
+        bool operator()(std::pair<uint256 const, uint256> const & a, uint256 const & b) const {
+            return a.first < b;
+        }
+    };
 
-    return confirmed;
+    // find unrewarded
+    UnrewardedResult result;
+    auto const rewards = pmasternodesview->ListAnchorRewards();
+    std::set_difference(confirmed.begin(), confirmed.end(), rewards.begin(), rewards.end(), std::inserter(result, result.end()), cmp());
+
+    return result;
 }
 
 int CAnchorIndex::GetAnchorConfirmations(uint256 const & txHash) const
@@ -454,8 +461,8 @@ void CAnchorIndex::CheckActiveAnchor(bool forced)
         /// @attention - 'it' depends on previous loop conditions (>=6).
         if (!::ChainstateActive().IsInitialBlockDownload()) {
 //            for (; it; it = panchors->GetAnchorByBtcTx(it->anchor.previousAnchor)) {
-//                if (penhancedview->GetRewardForAnchor(it->txHash) == uint256{}) {
-//                    penhancedview->CreateAndRelayConfirmMessageIfNeed(it->anchor, it->txHash);
+//                if (pmasternodesview->GetRewardForAnchor(it->txHash) == uint256{}) {
+//                    pmasternodesview->CreateAndRelayConfirmMessageIfNeed(it->anchor, it->txHash);
 //                }
 //            }
 
@@ -592,7 +599,7 @@ bool ValidateAnchor(const CAnchor & anchor, bool noThrow)
 
         // team context:
         // current team for THIS message extracted from PREV anchor message, overwise "genesis" team
-        CCustomCSView::CTeam curTeam = panchors->GetNextTeam(anchor.previousAnchor);
+        CMasternodesView::CTeam curTeam = panchors->GetNextTeam(anchor.previousAnchor);
         assert(!curTeam.empty()); // we should not get empty team with valid prev!
 
         if (!anchor.CheckAuthSigs(curTeam)) {
@@ -638,7 +645,7 @@ uint256 CAnchorConfirmMessage::GetSignHash() const
     return Hash(ss.begin(), ss.end());
 }
 
-bool CAnchorConfirmMessage::CheckConfirmSigs(std::vector<Signature> const & sigs, CCustomCSView::CTeam team)
+bool CAnchorConfirmMessage::CheckConfirmSigs(std::vector<Signature> const & sigs, CMasternodesView::CTeam team)
 {
     return CheckSigs(GetSignHash(), sigs, team);
 }
@@ -693,8 +700,8 @@ bool CAnchorAwaitingConfirms::Validate(CAnchorConfirmMessage const &confirmMessa
         LogPrintf("AnchorConfirms::Validate: Warning! Signature incorrect. btcTxHash: %s confirmMessageHash: %s Key: %s\n", confirmMessage.btcTxHash.ToString(), confirmMessage.GetHash().ToString(), signer.ToString());
         return false;
     }
-    auto it = pcustomcsview->ExistMasternodeByOperator(signer);
-    if (!it || !pcustomcsview->ExistMasternode(*it)->IsActive()) {
+    auto it = pmasternodesview->ExistMasternode(CMasternodesView::AuthIndex::ByOperator, signer);
+    if (!it || !pmasternodesview->ExistMasternode((*it)->second)->IsActive()) {
         LogPrintf("AnchorConfirms::Validate: Warning! Masternode with operator key %s does not exist or not active!\n", signer.ToString());
         return false;
     }
@@ -717,22 +724,22 @@ void CAnchorAwaitingConfirms::ReVote()
 {
     AssertLockHeld(cs_main);
 
-    auto myIDs = pcustomcsview->AmIOperator();
-    if (myIDs && pcustomcsview->ExistMasternode(myIDs->second)->IsActive()) {
-        auto const & currentTeam = pcustomcsview->GetCurrentTeam();
-        if (currentTeam.find(myIDs->first) != currentTeam.end()) {
+    auto myIDs = pmasternodesview->AmIOperator();
+    if (myIDs && pmasternodesview->ExistMasternode(myIDs->id)->IsActive()) {
+        auto const & currentTeam = pmasternodesview->GetCurrentTeam();
+        if (currentTeam.find(myIDs->operatorAuthAddress) != currentTeam.end()) {
 
             CAnchorIndex::UnrewardedResult unrewarded = panchors->GetUnrewarded();
             for (auto const & btcTxHash : unrewarded) {
                 /// @todo non-optimal! (secondary checks of amI, keys etc...)
-                pcustomcsview->CreateAndRelayConfirmMessageIfNeed(panchors->ExistAnchorByTx(btcTxHash)->anchor, btcTxHash);
+                pmasternodesview->CreateAndRelayConfirmMessageIfNeed(panchors->ExistAnchorByTx(btcTxHash)->anchor, btcTxHash);
             }
         }
     }
 }
 
 // for MINERS only!
-std::vector<CAnchorConfirmMessage> CAnchorAwaitingConfirms::GetQuorumFor(const CCustomCSView::CTeam & team) const
+std::vector<CAnchorConfirmMessage> CAnchorAwaitingConfirms::GetQuorumFor(const CMasternodesView::CTeam & team) const
 {
     AssertLockHeld(cs_main);
 

@@ -43,19 +43,6 @@ const std::vector<unsigned char>& GetObfuscateKey(const CDBWrapper &w);
 
 };
 
-//template<typename K>
-//inline leveldb::Slice SliceKey(const K& key) {
-//    CDataStream ssKey(SER_DISK, CLIENT_VERSION);
-//    ssKey.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
-//    ssKey << key;
-//    return leveldb::Slice (ssKey.data(), ssKey.size());
-//}
-
-//template<>
-//inline leveldb::Slice SliceKey<std::vector<unsigned char> >(const std::vector<unsigned char>& key) {
-//    return leveldb::Slice (reinterpret_cast<char const*>(key.data()), key.size());
-//}
-
 /** Batch of changes queued to be written to a CDBWrapper */
 class CDBBatch
 {
@@ -88,7 +75,6 @@ public:
         ssKey.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
         ssKey << key;
         leveldb::Slice slKey(ssKey.data(), ssKey.size());
-//        leveldb::Slice slKey(SliceKey(key));
 
         ssValue.reserve(DBWRAPPER_PREALLOC_VALUE_SIZE);
         ssValue << value;
@@ -114,7 +100,6 @@ public:
         ssKey.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
         ssKey << key;
         leveldb::Slice slKey(ssKey.data(), ssKey.size());
-//        leveldb::Slice slKey(SliceKey(key));
 
         batch.Delete(slKey);
         // LevelDB serializes erases as:
@@ -154,7 +139,6 @@ public:
         ssKey.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
         ssKey << key;
         leveldb::Slice slKey(ssKey.data(), ssKey.size());
-//        leveldb::Slice slKey(SliceKey(key));
         piter->Seek(slKey);
     }
 
@@ -188,20 +172,6 @@ public:
     }
 
 };
-
-//template<>
-//inline void CDBIterator::Seek<std::vector<unsigned char> >(const std::vector<unsigned char>& key) {
-//    leveldb::Slice slKey(reinterpret_cast<char const*>(key.data()), key.size());
-//    piter->Seek(slKey);
-//}
-
-//template<>
-//inline bool CDBIterator::GetKey<std::vector<unsigned char> >(std::vector<unsigned char> & key) {
-//    leveldb::Slice slKey = piter->key();
-//    key = std::vector<unsigned char>(slKey.data(), slKey.data()+slKey.size());
-//    return true;
-//}
-
 
 class CDBWrapper
 {
@@ -264,7 +234,6 @@ public:
         ssKey.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
         ssKey << key;
         leveldb::Slice slKey(ssKey.data(), ssKey.size());
-//        leveldb::Slice slKey(SliceKey(key));
 
         std::string strValue;
         leveldb::Status status = pdb->Get(readoptions, slKey, &strValue);
@@ -299,7 +268,6 @@ public:
         ssKey.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
         ssKey << key;
         leveldb::Slice slKey(ssKey.data(), ssKey.size());
-//        leveldb::Slice slKey(SliceKey(key));
 
         std::string strValue;
         leveldb::Status status = pdb->Get(readoptions, slKey, &strValue);

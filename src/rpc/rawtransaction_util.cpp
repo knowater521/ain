@@ -7,9 +7,7 @@
 
 #include <coins.h>
 #include <core_io.h>
-#include <interfaces/chain.h>
 #include <key_io.h>
-#include <masternodes/tokens.h>
 #include <policy/policy.h>
 #include <primitives/transaction.h>
 #include <rpc/request.h>
@@ -21,31 +19,7 @@
 #include <util/rbf.h>
 #include <util/strencodings.h>
 
-#include <string>
-
-std::pair<std::string, std::string> SplitTokenAddress(std::string const & output)
-{
-    const unsigned char TOKEN_SPLITTER = '@';
-    size_t pos = output.rfind(TOKEN_SPLITTER);
-    std::string address = (pos != std::string::npos) ? output.substr(pos+1) : output;
-    std::string token_str = (pos != std::string::npos) ? output.substr(0, pos) : "";
-    return { token_str, address };
-}
-
-TokenDestination::TokenDestination(const std::string & output, const interfaces::Chain & chain) {
-    auto pair = SplitTokenAddress(output);
-
-    destination = DecodeDestination(pair.second);
-    if (!IsValidDestination(destination)) {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Defi address: ") + pair.second);
-    }
-    std::unique_ptr<CToken> token = chain.existTokenGuessId(pair.first, tokenId);
-    if (!token) {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Defi token: ") + pair.first);
-    }
-}
-
-CMutableTransaction ConstructTransaction(const UniValue& inputs_in, const UniValue& outputs_in, const UniValue& locktime, bool rbf, interfaces::Chain const & chain)
+CMutableTransaction ConstructTransaction(const UniValue& inputs_in, const UniValue& outputs_in, const UniValue& locktime, bool rbf)
 {
     if (inputs_in.isNull() || outputs_in.isNull())
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, arguments 1 and 2 must be non-null");
@@ -118,7 +92,7 @@ CMutableTransaction ConstructTransaction(const UniValue& inputs_in, const UniVal
     }
 
     // Duplicate checking
-    std::set<TokenDestination> destinations;
+    std::set<CTxDestination> destinations;
     bool has_data{false};
 
     for (const std::string& name_ : outputs.getKeys()) {
@@ -132,15 +106,19 @@ CMutableTransaction ConstructTransaction(const UniValue& inputs_in, const UniVal
             CTxOut out(0, CScript() << OP_RETURN << data);
             rawTx.vout.push_back(out);
         } else {
-            TokenDestination token_dest(name_, chain);
-            if (!destinations.insert(token_dest).second) {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid parameter, duplicated pair 'token@address': ") + name_);
+            CTxDestination destination = DecodeDestination(name_);
+            if (!IsValidDestination(destination)) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Defi address: ") + name_);
             }
 
-            CScript scriptPubKey = GetScriptForDestination(token_dest.destination);
+            if (!destinations.insert(destination).second) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid parameter, duplicated address: ") + name_);
+            }
+
+            CScript scriptPubKey = GetScriptForDestination(destination);
             CAmount nAmount = AmountFromValue(outputs[name_]);
 
-            CTxOut out(nAmount, scriptPubKey, token_dest.tokenId);
+            CTxOut out(nAmount, scriptPubKey);
             rawTx.vout.push_back(out);
         }
     }
@@ -304,4 +282,3 @@ UniValue SignTransaction(CMutableTransaction& mtx, const UniValue& prevTxsUnival
 
     return result;
 }
-

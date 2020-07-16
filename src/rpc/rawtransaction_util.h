@@ -5,8 +5,6 @@
 #ifndef DEFI_RPC_RAWTRANSACTION_UTIL_H
 #define DEFI_RPC_RAWTRANSACTION_UTIL_H
 
-#include <script/standard.h> // CTxDestination
-
 #include <map>
 
 class FillableSigningProvider;
@@ -14,21 +12,6 @@ class UniValue;
 struct CMutableTransaction;
 class Coin;
 class COutPoint;
-
-namespace interfaces {
-class Chain;
-}
-
-std::pair<std::string, std::string> SplitTokenAddress(std::string const & output);
-
-struct TokenDestination
-{
-    DCT_ID tokenId;
-    CTxDestination destination;
-
-    TokenDestination(std::string const & output, interfaces::Chain const & chain);
-    inline bool operator< (const TokenDestination& rhs) const { return tokenId < rhs.tokenId || (tokenId == rhs.tokenId ? destination < rhs.destination : false ); }
-};
 
 /**
  * Sign a transaction with the given keystore and previous transactions
@@ -44,6 +27,6 @@ struct TokenDestination
 UniValue SignTransaction(CMutableTransaction& mtx, const UniValue& prevTxs, FillableSigningProvider* keystore, std::map<COutPoint, Coin>& coins, bool tempKeystore, const UniValue& hashType);
 
 /** Create a transaction from univalue parameters */
-CMutableTransaction ConstructTransaction(const UniValue& inputs_in, const UniValue& outputs_in, const UniValue& locktime, bool rbf, interfaces::Chain const & chain);
+CMutableTransaction ConstructTransaction(const UniValue& inputs_in, const UniValue& outputs_in, const UniValue& locktime, bool rbf);
 
 #endif // DEFI_RPC_RAWTRANSACTION_UTIL_H

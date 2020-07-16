@@ -335,7 +335,6 @@ struct CRecipient
 {
     CScript scriptPubKey;
     CAmount nAmount;
-    DCT_ID nTokenId;
     bool fSubtractFeeFromAmount;
 };
 
@@ -453,11 +452,11 @@ public:
 
     // memory only
     enum AmountType { DEBIT, CREDIT, IMMATURE_CREDIT, AVAILABLE_CREDIT, AMOUNTTYPE_ENUM_ELEMENTS };
-    TAmounts const & GetCachableAmounts(AmountType type, const isminefilter& filter, bool recalculate = false) const;
+    CAmount GetCachableAmount(AmountType type, const isminefilter& filter, bool recalculate = false) const;
     mutable CachableAmount m_amounts[AMOUNTTYPE_ENUM_ELEMENTS];
     mutable bool fChangeCached;
     mutable bool fInMempool;
-    mutable TAmounts nChangeCached;
+    mutable CAmount nChangeCached;
 
     CWalletTx(const CWallet* pwalletIn, CTransactionRef arg)
         : tx(std::move(arg)),
@@ -478,7 +477,7 @@ public:
         fFromMe = false;
         fChangeCached = false;
         fInMempool = false;
-        nChangeCached.clear();
+        nChangeCached = 0;
         nOrderPos = -1;
     }
 
@@ -549,16 +548,16 @@ public:
     }
 
     //! filter decides which addresses will count towards the debit
-    TAmounts GetDebit(const isminefilter& filter) const;
-    TAmounts GetCredit(interfaces::Chain::Lock& locked_chain, const isminefilter& filter) const;
+    CAmount GetDebit(const isminefilter& filter) const;
+    CAmount GetCredit(interfaces::Chain::Lock& locked_chain, const isminefilter& filter) const;
     CAmount GetImmatureCredit(interfaces::Chain::Lock& locked_chain, bool fUseCache=true) const;
     // TODO: Remove "NO_THREAD_SAFETY_ANALYSIS" and replace it with the correct
     // annotation "EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet)". The
     // annotation "NO_THREAD_SAFETY_ANALYSIS" was temporarily added to avoid
     // having to resolve the issue of member access into incomplete type CWallet.
-    TAmounts GetAvailableCredit(interfaces::Chain::Lock& locked_chain, bool fUseCache=true, const isminefilter& filter=ISMINE_SPENDABLE) const NO_THREAD_SAFETY_ANALYSIS;
+    CAmount GetAvailableCredit(interfaces::Chain::Lock& locked_chain, bool fUseCache=true, const isminefilter& filter=ISMINE_SPENDABLE) const NO_THREAD_SAFETY_ANALYSIS;
     CAmount GetImmatureWatchOnlyCredit(interfaces::Chain::Lock& locked_chain, const bool fUseCache=true) const;
-    TAmounts GetChange() const;
+    CAmount GetChange() const;
 
     // Get the marginal bytes if spending the specified output from this transaction
     int GetSpendSize(unsigned int out, bool use_max_sig = false) const
@@ -571,8 +570,7 @@ public:
 
     bool IsFromMe(const isminefilter& filter) const
     {
-        TAmounts amounts = GetDebit(filter);
-        return amounts.size() > 0 && (amounts.size() > 1 || amounts.begin()->second > 0); // non-zero tokens, or possible non-zero `amounts[0]`
+        return (GetDebit(filter) > 0);
     }
 
     // True if only scriptSigs are different
@@ -1073,11 +1071,11 @@ public:
     void ReacceptWalletTransactions(interfaces::Chain::Lock& locked_chain) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     void ResendWalletTransactions();
     struct Balance {
-        TAmounts m_mine_trusted{{DCT_ID{0}, 0}};           //!< Trusted, at depth=GetBalance.min_depth or more
-        TAmounts m_mine_untrusted_pending{{DCT_ID{0}, 0}}; //!< Untrusted, but in mempool (pending)
+        CAmount m_mine_trusted{0};           //!< Trusted, at depth=GetBalance.min_depth or more
+        CAmount m_mine_untrusted_pending{0}; //!< Untrusted, but in mempool (pending)
         CAmount m_mine_immature{0};          //!< Immature coinbases in the main chain
-        TAmounts m_watchonly_trusted{{DCT_ID{0}, 0}};
-        TAmounts m_watchonly_untrusted_pending{{DCT_ID{0}, 0}};
+        CAmount m_watchonly_trusted{0};
+        CAmount m_watchonly_untrusted_pending{0};
         CAmount m_watchonly_immature{0};
     };
     Balance GetBalance(int min_depth = 0, bool avoid_reuse = true) const;
@@ -1100,10 +1098,6 @@ public:
     bool CreateTransaction(interfaces::Chain::Lock& locked_chain, const std::vector<CRecipient>& vecSend, CTransactionRef& tx, CAmount& nFeeRet, int& nChangePosInOut,
                            std::string& strFailReason, const CCoinControl& coin_control, bool sign = true);
     bool CommitTransaction(CTransactionRef tx, mapValue_t mapValue, std::vector<std::pair<std::string, std::string>> orderForm, CValidationState& state);
-
-    /// @todo tokens: refactor to unify with new general CreateTransaction()
-    bool CreateMintTokenTransaction(interfaces::Chain::Lock& locked_chain, CMutableTransaction &origTx, CTransactionRef& tx, CAmount& nFeeRet, int& nChangePosInOut,
-                           std::string& strFailReason, const CCoinControl& coin_control, bool sign = true);
 
     bool DummySignTx(CMutableTransaction &txNew, const std::set<CTxOut> &txouts, bool use_max_sig = false) const
     {
@@ -1178,20 +1172,20 @@ public:
      * Returns amount of debit if the input matches the
      * filter, otherwise returns 0
      */
-    CTokenAmount GetDebit(const CTxIn& txin, const isminefilter& filter) const;
+    CAmount GetDebit(const CTxIn& txin, const isminefilter& filter) const;
     isminetype IsMine(const CTxOut& txout) const;
-    CTokenAmount GetCredit(const CTxOut& txout, const isminefilter& filter) const;
+    CAmount GetCredit(const CTxOut& txout, const isminefilter& filter) const;
     bool IsChange(const CTxOut& txout) const;
     bool IsChange(const CScript& script) const;
-    CTokenAmount GetChange(const CTxOut& txout) const;
+    CAmount GetChange(const CTxOut& txout) const;
     bool IsMine(const CTransaction& tx) const;
     /** should probably be renamed to IsRelevantToMe */
     bool IsFromMe(const CTransaction& tx) const;
-    TAmounts GetDebit(const CTransaction& tx, const isminefilter& filter) const;
+    CAmount GetDebit(const CTransaction& tx, const isminefilter& filter) const;
     /** Returns whether all of the inputs match the filter */
     bool IsAllFromMe(const CTransaction& tx, const isminefilter& filter) const;
-    TAmounts GetCredit(const CTransaction& tx, const isminefilter& filter) const;
-    TAmounts GetChange(const CTransaction& tx) const;
+    CAmount GetCredit(const CTransaction& tx, const isminefilter& filter) const;
+    CAmount GetChange(const CTransaction& tx) const;
     void ChainStateFlushed(const CBlockLocator& loc) override;
 
     DBErrors LoadWallet(bool& fFirstRunRet);

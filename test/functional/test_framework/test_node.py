@@ -97,7 +97,6 @@ class TestNode():
             "-masternode_operator="+self.get_genesis_keys().operatorAuthAddress,
             "-dummypos=1",
             "-nospv",
-            "-txnotokens=1",
         ]
 
         self.cli = TestNodeCLI(defi_cli, self.datadir)

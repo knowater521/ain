@@ -13,7 +13,6 @@
 
 const std::string CBaseChainParams::MAIN = "main";
 const std::string CBaseChainParams::TESTNET = "test";
-const std::string CBaseChainParams::DEVNET = "devnet";
 const std::string CBaseChainParams::REGTEST = "regtest";
 
 void SetupChainParamsBaseOptions()
@@ -22,7 +21,6 @@ void SetupChainParamsBaseOptions()
                                    "This is intended for regression testing tools and app development.", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::CHAINPARAMS);
     gArgs.AddArg("-segwitheight=<n>", "Set the activation height of segwit. -1 to disable. (regtest-only)", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::DEBUG_TEST);
     gArgs.AddArg("-testnet", "Use the test chain", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
-    gArgs.AddArg("-devnet", "Use the dev chain", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
     gArgs.AddArg("-vbparams=deployment:start:end", "Use given start/end times for specified version bits deployment (regtest-only)", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::CHAINPARAMS);
 }
 
@@ -40,8 +38,6 @@ std::unique_ptr<CBaseChainParams> CreateBaseChainParams(const std::string& chain
         return MakeUnique<CBaseChainParams>("", 8554);
     else if (chain == CBaseChainParams::TESTNET)
         return MakeUnique<CBaseChainParams>("testnet3", 18554);
-    else if (chain == CBaseChainParams::DEVNET)
-        return MakeUnique<CBaseChainParams>("devnet", 20554);
     else if (chain == CBaseChainParams::REGTEST)
         return MakeUnique<CBaseChainParams>("regtest", 19554);
     else

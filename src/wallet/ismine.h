@@ -38,20 +38,15 @@ struct CachableAmount
 {
     // NO and ALL are never (supposed to be) cached
     std::bitset<ISMINE_ENUM_ELEMENTS> m_cached;
-    TAmounts m_value[ISMINE_ENUM_ELEMENTS];
+    CAmount m_value[ISMINE_ENUM_ELEMENTS];
     inline void Reset()
     {
         m_cached.reset();
     }
-//    void Set(isminefilter filter, CAmount value)
-//    {
-//        m_cached.set(filter);
-//        m_value[filter] = value;
-//    }
-    void Set(isminefilter filter, TAmounts && amounts)
+    void Set(isminefilter filter, CAmount value)
     {
         m_cached.set(filter);
-        m_value[filter] = amounts;
+        m_value[filter] = value;
     }
 };
 

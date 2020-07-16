@@ -274,19 +274,15 @@ public:
     bool mnCanSpend(const uint256 & nodeId, int height) const override
     {
         LOCK(cs_main);
-        return pcustomcsview->CanSpend(nodeId, height);
+        return pmasternodesview->CanSpend(nodeId, height);
     }
 
-    boost::optional<CMasternode> mnExists(const uint256 & nodeId) const override
+    CMasternode const * mnExists(const uint256 & nodeId) const override
     {
         LOCK(cs_main);
-        return pcustomcsview->ExistMasternode(nodeId);
+        return pmasternodesview->ExistMasternode(nodeId);
     }
-    std::unique_ptr<CToken> existTokenGuessId(const std::string & str, DCT_ID & id) const override
-    {
-        LOCK(cs_main);
-        return pcustomcsview->ExistTokenGuessId(str, id);
-    }
+
     double guessVerificationProgress(const uint256& block_hash) override
     {
         LOCK(cs_main);

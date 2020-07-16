@@ -63,8 +63,8 @@ QString TransactionDesc::toHTML(interfaces::Node& node, interfaces::Wallet& wall
     strHTML += "<html><font face='verdana, arial, helvetica, sans-serif'>";
 
     int64_t nTime = wtx.time;
-    CAmount nCredit = wtx.credit[DCT_ID{0}];    /// @todo tokens: unimplemented in qt, dummy
-    CAmount nDebit = wtx.debit[DCT_ID{0}];      /// @todo tokens: unimplemented in qt, dummy
+    CAmount nCredit = wtx.credit;
+    CAmount nDebit = wtx.debit;
     CAmount nNet = nCredit - nDebit;
 
     strHTML += "<b>" + tr("Status") + ":</b> " + FormatTxStatus(wtx, status, inMempool, numBlocks);
@@ -136,7 +136,7 @@ QString TransactionDesc::toHTML(interfaces::Node& node, interfaces::Wallet& wall
         //
         CAmount nUnmatured = 0;
         for (const CTxOut& txout : wtx.tx->vout)
-            nUnmatured += wallet.getCredit(txout, ISMINE_ALL).nValue; /// @todo tokens: unimplemented in qt, type?
+            nUnmatured += wallet.getCredit(txout, ISMINE_ALL);
         strHTML += "<b>" + tr("Credit") + ":</b> ";
         if (status.is_in_main_chain)
             strHTML += DefiUnits::formatHtmlWithUnit(unit, nUnmatured)+ " (" + tr("matures in %n more block(s)", "", status.blocks_to_maturity) + ")";
@@ -209,13 +209,13 @@ QString TransactionDesc::toHTML(interfaces::Node& node, interfaces::Wallet& wall
             if (fAllToMe)
             {
                 // Payment to self
-                CAmount nChange = wtx.change[DCT_ID{0}];    /// @todo tokens: unimplemented in qt, dummy
+                CAmount nChange = wtx.change;
                 CAmount nValue = nCredit - nChange;
                 strHTML += "<b>" + tr("Total debit") + ":</b> " + DefiUnits::formatHtmlWithUnit(unit, -nValue) + "<br>";
                 strHTML += "<b>" + tr("Total credit") + ":</b> " + DefiUnits::formatHtmlWithUnit(unit, nValue) + "<br>";
             }
 
-            CAmount nTxFee = nDebit - wtx.tx->GetValueOut(); /// @todo tokens: unimplemented in qt
+            CAmount nTxFee = nDebit - wtx.tx->GetValueOut();
             if (nTxFee > 0)
                 strHTML += "<b>" + tr("Transaction fee") + ":</b> " + DefiUnits::formatHtmlWithUnit(unit, -nTxFee) + "<br>";
         }
@@ -227,13 +227,13 @@ QString TransactionDesc::toHTML(interfaces::Node& node, interfaces::Wallet& wall
             auto mine = wtx.txin_is_mine.begin();
             for (const CTxIn& txin : wtx.tx->vin) {
                 if (*(mine++)) {
-                    strHTML += "<b>" + tr("Debit") + ":</b> " + DefiUnits::formatHtmlWithUnit(unit, -wallet.getDebit(txin, ISMINE_ALL).nValue) + "<br>"; /// @todo tokens: unimplemented in qt
+                    strHTML += "<b>" + tr("Debit") + ":</b> " + DefiUnits::formatHtmlWithUnit(unit, -wallet.getDebit(txin, ISMINE_ALL)) + "<br>";
                 }
             }
             mine = wtx.txout_is_mine.begin();
             for (const CTxOut& txout : wtx.tx->vout) {
                 if (*(mine++)) {
-                    strHTML += "<b>" + tr("Credit") + ":</b> " + DefiUnits::formatHtmlWithUnit(unit, wallet.getCredit(txout, ISMINE_ALL).nValue) + "<br>"; /// @todo tokens: unimplemented in qt
+                    strHTML += "<b>" + tr("Credit") + ":</b> " + DefiUnits::formatHtmlWithUnit(unit, wallet.getCredit(txout, ISMINE_ALL)) + "<br>";
                 }
             }
         }
@@ -290,10 +290,10 @@ QString TransactionDesc::toHTML(interfaces::Node& node, interfaces::Wallet& wall
         strHTML += "<hr><br>" + tr("Debug information") + "<br><br>";
         for (const CTxIn& txin : wtx.tx->vin)
             if(wallet.txinIsMine(txin))
-                strHTML += "<b>" + tr("Debit") + ":</b> " + DefiUnits::formatHtmlWithUnit(unit, -wallet.getDebit(txin, ISMINE_ALL).nValue) + "<br>"; /// @todo tokens: unimplemented in qt
+                strHTML += "<b>" + tr("Debit") + ":</b> " + DefiUnits::formatHtmlWithUnit(unit, -wallet.getDebit(txin, ISMINE_ALL)) + "<br>";
         for (const CTxOut& txout : wtx.tx->vout)
             if(wallet.txoutIsMine(txout))
-                strHTML += "<b>" + tr("Credit") + ":</b> " + DefiUnits::formatHtmlWithUnit(unit, wallet.getCredit(txout, ISMINE_ALL).nValue) + "<br>"; /// @todo tokens: unimplemented in qt
+                strHTML += "<b>" + tr("Credit") + ":</b> " + DefiUnits::formatHtmlWithUnit(unit, wallet.getCredit(txout, ISMINE_ALL)) + "<br>";
 
         strHTML += "<br><b>" + tr("Transaction") + ":</b><br>";
         strHTML += GUIUtil::HtmlEscape(wtx.tx->ToString(), true);

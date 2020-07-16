@@ -59,7 +59,7 @@ class MasternodesRpcBasicTest (DefiTestFramework):
             self.nodes[0].sendrawtransaction(signedTx['hex'])
         except JSONRPCException as e:
             errorString = e.error['message']
-        assert("collateral-locked-in-mempool," in errorString)
+        assert("mn-collateral-locked-in-mempool," in errorString)
 
         self.nodes[0].generate(1)
         # At this point, mn was created
@@ -76,7 +76,7 @@ class MasternodesRpcBasicTest (DefiTestFramework):
             self.nodes[0].sendrawtransaction(signedTx['hex'])
         except JSONRPCException as e:
             errorString = e.error['message']
-        assert("collateral-locked," in errorString)
+        assert("mn-collateral-locked," in errorString)
 
 
         # RESIGNING:

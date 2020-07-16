@@ -91,7 +91,7 @@ static CBlock CreateBlock(const CBlockIndex* prev,
     {
         LOCK(cs_main);
 
-        auto nodePtr = pcustomcsview->ExistMasternode(masternodeID);
+        auto nodePtr = pmasternodesview->ExistMasternode(masternodeID);
         if (!nodePtr || !nodePtr->IsActive(prev->height))
             return {};
 

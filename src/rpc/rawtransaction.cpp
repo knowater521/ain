@@ -9,7 +9,6 @@
 #include <compat/byteswap.h>
 #include <consensus/validation.h>
 #include <core_io.h>
-#include <init.h>
 #include <index/txindex.h>
 #include <merkleblock.h>
 #include <node/coin.h>
@@ -406,7 +405,7 @@ static UniValue createrawtransaction(const JSONRPCRequest& request)
     if (!request.params[3].isNull()) {
         rbf = request.params[3].isTrue();
     }
-    CMutableTransaction rawTx = ConstructTransaction(request.params[0], request.params[1], request.params[2], rbf, *g_rpc_interfaces->chain);
+    CMutableTransaction rawTx = ConstructTransaction(request.params[0], request.params[1], request.params[2], rbf);
 
     return EncodeHexTx(CTransaction(rawTx));
 }
@@ -1064,7 +1063,7 @@ UniValue decodepsbt(const JSONRPCRequest& request)
         UniValue in(UniValue::VOBJ);
         // UTXOs
         if (!input.witness_utxo.IsNull()) {
-            const CTxOut& txout = input.witness_utxo; /// @todo tokens: extend with correct txout version (and/or tokenid) when implemented
+            const CTxOut& txout = input.witness_utxo;
 
             UniValue out(UniValue::VOBJ);
 
@@ -1369,15 +1368,7 @@ UniValue createpsbt(const JSONRPCRequest& request)
     if (!request.params[3].isNull()) {
         rbf = request.params[3].isTrue();
     }
-
-//    std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
-//    CWallet* const pwallet = wallet.get();
-
-//    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
-//        return NullUniValue;
-//    }
-
-    CMutableTransaction rawTx = ConstructTransaction(request.params[0], request.params[1], request.params[2], rbf, *g_rpc_interfaces->chain);
+    CMutableTransaction rawTx = ConstructTransaction(request.params[0], request.params[1], request.params[2], rbf);
 
     // Make a blank psbt
     PartiallySignedTransaction psbtx;
@@ -1531,7 +1522,7 @@ UniValue utxoupdatepsbt(const JSONRPCRequest& request)
         const Coin& coin = view.AccessCoin(psbtx.tx->vin[i].prevout);
 
         if (IsSegWitOutput(provider, coin.out.scriptPubKey)) {
-            input.witness_utxo = coin.out; /// @todo tokens: extend with correct txout version (and/or tokenid) when implemented
+            input.witness_utxo = coin.out;
         }
 
         // Update script/keypath information using descriptor data.

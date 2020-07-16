@@ -50,7 +50,7 @@ static CBlock BuildBlockTestCase() {
         LOCK(cs_main);
         tip = ::ChainActive().Tip();
 
-        auto nodePtr = pcustomcsview->ExistMasternode(masternodeID);
+        auto nodePtr = pmasternodesview->ExistMasternode(masternodeID);
         if (!nodePtr || !nodePtr->IsActive(tip->height))
             return {};
 
@@ -345,7 +345,7 @@ BOOST_AUTO_TEST_CASE(EmptyBlockRoundTripTest)
 //        LOCK(cs_main);
 //        tip = ::ChainActive().Tip();
 //
-//        auto nodePtr = penhancedview->ExistMasternode(masternodeID);
+//        auto nodePtr = pmasternodesview->ExistMasternode(masternodeID);
 //        BOOST_CHECK(nodePtr && nodePtr->IsActive(tip->height));
 //
 //        mintedBlocks = nodePtr->mintedBlocks;

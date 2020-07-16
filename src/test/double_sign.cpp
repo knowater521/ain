@@ -1,7 +1,6 @@
 #include <chainparams.h>
 #include <consensus/merkle.h>
 #include <consensus/validation.h>
-#include <masternodes/criminals.h>
 #include <masternodes/masternodes.h>
 #include <miner.h>
 #include <pos.h>
@@ -80,15 +79,13 @@ BOOST_AUTO_TEST_CASE(check_doublesign)
     uint64_t mintedBlocks = 0;
     std::vector<CBlockHeader> criminalsBlockHeaders = GenerateTwoCriminalsHeaders(minterKey, mintedBlocks, masternodeID);
 
-    /// @todo newbase
-    pcriminals->WriteMintedBlockHeader(masternodeID, mintedBlocks, criminalsBlockHeaders[0].GetHash(), criminalsBlockHeaders[0], false);
-    pcriminals->WriteMintedBlockHeader(masternodeID, mintedBlocks, criminalsBlockHeaders[1].GetHash(), criminalsBlockHeaders[1], false);
+    pmasternodesview->WriteMintedBlockHeader(masternodeID, mintedBlocks, criminalsBlockHeaders[0].GetHash(), criminalsBlockHeaders[0], false);
+    pmasternodesview->WriteMintedBlockHeader(masternodeID, mintedBlocks, criminalsBlockHeaders[1].GetHash(), criminalsBlockHeaders[1], false);
     CKeyID dummy;
-    BOOST_CHECK(IsDoubleSigned(criminalsBlockHeaders[0], criminalsBlockHeaders[1], dummy));
+    BOOST_CHECK(pmasternodesview->IsDoubleSigned(criminalsBlockHeaders[0], criminalsBlockHeaders[1], dummy));
 
     std::map<uint256, CBlockHeader> blockHeaders;
-    /// @todo newbase
-    BOOST_CHECK(pcriminals->FetchMintedHeaders(masternodeID, mintedBlocks, blockHeaders, false));
+    BOOST_CHECK(pmasternodesview->FetchMintedHeaders(masternodeID, mintedBlocks, blockHeaders, false));
     BOOST_CHECK(blockHeaders.size() == 2);
 }
 
@@ -104,8 +101,7 @@ BOOST_AUTO_TEST_CASE(check_criminal_entities)
     CValidationState state;
 
     BOOST_CHECK(ProcessNewBlockHeaders(criminalsBlockHeaders, state, Params()));
-    /// @todo newbase
-    CCriminalProofsView::CMnCriminals criminals = pcriminals->GetUnpunishedCriminals();
+    CMasternodesView::CMnCriminals criminals = pmasternodesview->GetUnpunishedCriminals();
     BOOST_CHECK(criminals.size() == 1);
     BOOST_CHECK(criminals.begin()->first == masternodeID);
     auto const & proof = criminals.begin()->second;
@@ -141,7 +137,7 @@ BOOST_AUTO_TEST_CASE(check_blocking_criminal_coins)
 
     BOOST_CHECK(ProcessNewBlockHeaders({block->GetBlockHeader()}, state, Params()));
 
-   // BOOST_CHECK(penhancedview->FindBlockedCriminalCoins(masternodeID, 0, false));
+   // BOOST_CHECK(pmasternodesview->FindBlockedCriminalCoins(masternodeID, 0, false));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
