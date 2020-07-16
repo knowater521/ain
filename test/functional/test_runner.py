@@ -130,6 +130,7 @@ BASE_SCRIPTS = [
     'rpc_misc.py',
     'rpc_mn_basic.py',
     'feature_initdist.py',
+    'rpc_tokens.py',
     'interface_rest.py',
     'mempool_spend_coinbase.py',
     'wallet_avoidreuse.py',
