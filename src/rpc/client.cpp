@@ -220,6 +220,11 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "spv_listanchors", 1, "maxBtcHeight" },
     { "spv_listanchors", 2, "minConfs" },
     { "spv_listanchors", 3, "maxConfs" },
+
+    { "createpriceoracle", 0, "inputs" },
+    { "createpriceoracle", 1, "metadata" },
+    { "deletepriceoracle", 0, "inputs" },
+    { "listpriceoracles", 0, "pagination" },
 };
 // clang-format on
 

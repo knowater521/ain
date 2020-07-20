@@ -1927,6 +1927,300 @@ UniValue accounttoutxos(const JSONRPCRequest& request) {
     return signsend(rawTx, request, pwallet)->GetHash().GetHex();
 }
 
+UniValue oracleToJSON(const CScript &oracle, CAmount const& val) {
+    UniValue obj(UniValue::VOBJ);
+    UniValue oracleObj(UniValue::VOBJ);
+    ScriptPubKeyToUniv(oracle, oracleObj, true);
+    obj.pushKV("oracle", oracleObj);
+    obj.pushKV("weight", (int64_t) val);
+    return obj;
+}
+
+UniValue createpriceoracle(const JSONRPCRequest& request) {
+    CWallet* const pwallet = GetWallet(request);
+
+    auto h = RPCHelpMan{"createpriceoracle",
+               "\nCreates (and submits to local node and network) an oracle creation transaction with given metadata.\n"
+               "The first optional argument (may be empty array) is an array of specific UTXOs to spend." +
+               HelpRequiringPassphrase(pwallet) + "\n",
+               {
+                       {"inputs", RPCArg::Type::ARR, RPCArg::Optional::OMITTED_NAMED_ARG,
+                        "A json array of json objects",
+                        {
+                                {"", RPCArg::Type::OBJ, RPCArg::Optional::OMITTED, "",
+                                 {
+                                         {"txid", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The transaction id"},
+                                         {"vout", RPCArg::Type::NUM, RPCArg::Optional::NO, "The output number"},
+                                 },
+                                },
+                        },
+                       },
+                       {"metadata", RPCArg::Type::OBJ, RPCArg::Optional::NO, "",
+                        {
+                                {"oracle", RPCArg::Type::STR, RPCArg::Optional::NO,
+                                 "Address (script pub key) which is authorized to post prices \"string\""},
+                                {"weight", RPCArg::Type::NUM, RPCArg::Optional::NO,
+                                 "Weight which oracle has in median price calculation \"number\""},
+                        },
+                       },
+               },
+               RPCResult{
+                       "\"hex\"                  (string) The hex-encoded raw transaction with signature(s)\n"
+               },
+               RPCExamples{//int64 1*10^8 == 1.00000000, base ->uint64
+                       HelpExampleCli("createpriceoracle", "\"[]\" "
+                                                     "\"{\\\"oracle\\\":\\\"address\\\","
+                                                     "\\\"weight\\\":\\\"0.33\\\","
+                                                     "}\"")
+               },
+    };
+    h.Check(request);
+
+    if (pwallet->chain().isInitialBlockDownload()) {
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Cannot create transactions while still in Initial Block Download");
+    }
+
+    RPCTypeCheck(request.params, {UniValue::VARR, UniValue::VOBJ}, false);
+    UniValue metaObj = request.params[1].get_obj();
+    if (metaObj["oracle"].isNull() || metaObj["weight"].isNull()) {
+        throw std::runtime_error(h.ToString());
+    }
+
+    CCreateWeightOracleMessage msg{};
+    msg.oracle = DecodeScript(metaObj["oracle"].get_str());
+    msg.weight = AmountFromValue(metaObj["weight"]);
+
+    // encode
+    CDataStream markedMetadata(DfTxMarker, SER_NETWORK, PROTOCOL_VERSION);
+    markedMetadata << static_cast<unsigned char>(CustomTxType::CreatePriceOracle) << msg;
+
+    CScript scriptMeta;
+    scriptMeta << OP_RETURN << ToByteVector(markedMetadata);
+
+    CMutableTransaction rawTx;
+    rawTx.vout.push_back(CTxOut(0, scriptMeta));
+
+
+    bool isFoundationMember = false;
+    for(std::set<CScript>::iterator it = Params().GetConsensus().foundationMembers.begin(); it != Params().GetConsensus().foundationMembers.end() && isFoundationMember == false; it++)
+    {
+        if(IsMine(*pwallet, *it) == ISMINE_SPENDABLE)
+        {
+            CTxDestination destination;
+            if (!ExtractDestination(*it, destination)) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid oracle destination");
+            }
+            try {
+                rawTx.vin = GetAuthInputs(pwallet, destination, request.params[0].get_array());
+                isFoundationMember = true;
+            }
+            catch (const UniValue& objError) {
+                throw std::runtime_error(find_value(objError, "message").get_str());
+            }
+        }
+    }
+
+    // fund
+    rawTx = fund(rawTx, request, pwallet);
+
+    // check execution
+    {
+        LOCK(cs_main);
+        CCustomCSView mnview_dummy(*pcustomcsview); // don't write into actual DB
+        const auto res = ApplyCreatePriceOracleTx(mnview_dummy, g_chainstate->CoinsTip(), CTransaction(rawTx),
+                                                  ToByteVector(CDataStream{SER_NETWORK, PROTOCOL_VERSION, msg}));
+        if (!res.ok) {
+            if (res.code == CustomTxErrCodes::NotEnoughBalance) {
+                throw JSONRPCError(RPC_INVALID_REQUEST,
+                                   "Execution test failed: not enough balance on owner's account, call utxostoaccount to increase it.\n" +
+                                   res.msg);
+            }
+            throw JSONRPCError(RPC_INVALID_REQUEST, "Execution test failed:\n" + res.msg);
+        }
+    }
+
+    return signsend(rawTx, request, pwallet)->GetHash().GetHex();
+}
+
+UniValue deletepriceoracle(const JSONRPCRequest& request) {
+    CWallet* const pwallet = GetWallet(request);
+
+    auto h = RPCHelpMan{"deletepriceoracle",
+               "\nCreates (and submits to local node and network) deletion of oracle price transaction with given metadata.\n"
+               "The first optional argument (may be empty array) is an array of specific UTXOs to spend." +
+               HelpRequiringPassphrase(pwallet) + "\n",
+               {
+                       {"inputs", RPCArg::Type::ARR, RPCArg::Optional::OMITTED_NAMED_ARG,
+                        "A json array of json objects",
+                        {
+                                {"", RPCArg::Type::OBJ, RPCArg::Optional::OMITTED, "",
+                                 {
+                                         {"txid", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The transaction id"},
+                                         {"vout", RPCArg::Type::NUM, RPCArg::Optional::NO, "The output number"},
+                                 },
+                                },
+                        },
+                       },
+                       {"oracle", RPCArg::Type::STR, RPCArg::Optional::NO,
+                        "Address (script pub key) which is authorized to delete price \"string\""},
+               },
+               RPCResult{
+                       "\"hex\"                  (string) The hex-encoded raw transaction with signature(s)\n"
+               },
+               RPCExamples{
+                       HelpExampleCli("deletepriceoracle", "\"[]\" \"oracle\"")
+               },
+    };
+    h.Check(request);
+
+    if (pwallet->chain().isInitialBlockDownload()) {
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Cannot create transactions while still in Initial Block Download");
+    }
+
+    RPCTypeCheck(request.params, {UniValue::VARR, UniValue::VOBJ}, false);
+    UniValue metaObj = request.params[1].get_obj();
+    if (metaObj["oracle"].isNull()) {
+        throw std::runtime_error(h.ToString());
+    }
+
+    // encode
+    CScript msg = DecodeScript(metaObj["oracle"].get_str());
+    CDataStream markedMetadata(DfTxMarker, SER_NETWORK, PROTOCOL_VERSION);
+    markedMetadata << static_cast<unsigned char>(CustomTxType::DeletePriceOracle) << msg;
+
+    CScript scriptMeta;
+    scriptMeta << OP_RETURN << ToByteVector(markedMetadata);
+
+    CMutableTransaction rawTx;
+    rawTx.vout.push_back(CTxOut(0, scriptMeta));
+
+    bool isFoundationMember = false;
+    for(std::set<CScript>::iterator it = Params().GetConsensus().foundationMembers.begin(); it != Params().GetConsensus().foundationMembers.end() && isFoundationMember == false; it++)
+    {
+        if(IsMine(*pwallet, *it) == ISMINE_SPENDABLE)
+        {
+            CTxDestination destination;
+            if (!ExtractDestination(*it, destination)) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid oracle destination");
+            }
+            try {
+                rawTx.vin = GetAuthInputs(pwallet, destination, request.params[0].get_array());
+                isFoundationMember = true;
+            }
+            catch (const UniValue& objError) {
+                throw std::runtime_error(find_value(objError, "message").get_str());
+            }
+        }
+    }
+
+    // fund
+    rawTx = fund(rawTx, request, pwallet);
+
+    // check execution
+    {
+        LOCK(cs_main);
+        CCustomCSView mnview_dummy(*pcustomcsview); // don't write into actual DB
+        const auto res = ApplyDeletePriceOracleTx(mnview_dummy, ::ChainstateActive().CoinsTip(), CTransaction(rawTx),
+                                             ToByteVector(CDataStream{SER_NETWORK, PROTOCOL_VERSION, msg}));
+        if (!res.ok) {
+            throw JSONRPCError(RPC_INVALID_REQUEST, "Execution test failed:\n" + res.msg);
+        }
+    }
+
+    return signsend(rawTx, request, pwallet)->GetHash().GetHex();
+}
+
+UniValue getpriceoracle(const JSONRPCRequest& request) {
+    RPCHelpMan{"getpriceoracle",
+               "\nReturns information about oracles.\n",
+               {
+                       {"oracle", RPCArg::Type::STR, RPCArg::Optional::NO,
+                        "CScript of the price oracle transaction"},
+               },
+               RPCResult{
+                       "{...}     (array) Json object with oracle information\n"
+               },
+               RPCExamples{
+                       HelpExampleCli("getpriceoracle", "oracle")
+               },
+    }.Check(request);
+
+    UniValue metaObj = request.params[0].get_obj();
+    CScript oracle = DecodeScript(metaObj["oracle"].get_str());
+
+    const auto oracleWeight = pcustomcsview->GetOracleWeight(oracle);
+    if (oracleWeight) {
+        return oracleToJSON(oracle, *oracleWeight);
+    }
+    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Oracle not found");
+}
+
+UniValue listpriceoracles(const JSONRPCRequest& request) {
+    RPCHelpMan{"listpriceoracles",
+               "\nReturns information about oracles.\n",
+               {
+                       {"pagination", RPCArg::Type::OBJ, RPCArg::Optional::OMITTED, "",
+                        {
+                                {"start", RPCArg::Type::STR_HEX, RPCArg::Optional::OMITTED,
+                                 "Optional first key to iterate from, in lexicographical order."
+                                 "Typically it's set to last ID from previous request."},
+                                {"including_start", RPCArg::Type::BOOL, RPCArg::Optional::OMITTED,
+                                 "If true, then iterate including starting position. False by default"},
+                                {"limit", RPCArg::Type::NUM, RPCArg::Optional::OMITTED,
+                                 "Maximum number of price oracles to return, 100 by default"},
+                        },
+                       },
+               },
+               RPCResult{
+                       "{id:{...},...}     (array) Json object with orders information\n"
+               },
+               RPCExamples{
+                       HelpExampleCli("listoracles", "")
+                         + HelpExampleRpc("listoracles","'{\"start\":\"34d9dae59f94bf3922a5af934dbfea810c24e6416683301aebb67272675c6109\","
+                                                        "\"limit\":\"1000\""
+                                                        "}'")
+               },
+    }.Check(request);
+
+    // parse pagination
+    size_t limit = 100;
+    CScript start = {};
+    {
+        if (request.params.size() > 0) {
+            bool including_start = false;
+            UniValue paginationObj = request.params[0].get_obj();
+            if (!paginationObj["limit"].isNull()) {
+                limit = (size_t) paginationObj["limit"].get_int64();
+            }
+            if (!paginationObj["start"].isNull()) {
+                start = DecodeScript(paginationObj["start"].get_str());
+            }
+            if (!paginationObj["including_start"].isNull()) {
+                including_start = paginationObj["including_start"].getBool();
+            }
+            if (!including_start) {
+                CScript startTestCopy(start);//for debug/test only, can be deleted
+                std::vector<unsigned char>startBVTest = ToByteVector(start);//for debug/test only, can be deleted
+                std::vector<unsigned char>start2BVTest = ToByteVector(start + CScript(0));//for debug/test only, can be deleted
+                start += CScript(0);
+            }
+        }
+        if (limit == 0) {
+            limit = std::numeric_limits<decltype(limit)>::max();
+        }
+    }
+
+    UniValue ret(UniValue::VARR);
+
+    pcustomcsview->ForEachPriceOracleWeight([&](CScript const& oracle, CAmount const & weight) {
+        ret.push_back(oracleToJSON(oracle, weight));
+        limit--;
+        return limit != 0;
+    }, start);
+
+    return ret;
+}
+
 static const CRPCCommand commands[] =
 { //  category      name                  actor (function)     params
   //  ----------------- ------------------------    -----------------------     ----------
@@ -1951,6 +2245,10 @@ static const CRPCCommand commands[] =
     {"accounts",    "utxostoaccount",     &utxostoaccount,     {"inputs", "amounts"}},
     {"accounts",    "accounttoaccount",   &accounttoaccount,   {"inputs", "from", "to"}},
     {"accounts",    "accounttoutxos",     &accounttoutxos,     {"inputs", "from", "to"}},
+    {"oracles",     "createpriceoracle",  &createpriceoracle,  {"inputs", "metadata"}},
+    {"oracles",     "deletepriceoracle",  &deletepriceoracle,  {"inputs", "oracle"}},
+    {"oracles",     "getpriceoracle",     &getpriceoracle,     {"oracle"}},
+    {"oracles",     "listpriceoracles",   &listpriceoracles,   {"pagination"}},
 };
 
 void RegisterMasternodesRPCCommands(CRPCTable& tableRPC) {

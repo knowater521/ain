@@ -164,6 +164,12 @@ Res ApplyCustomTx(CCustomCSView & base_mnview, CCoinsViewCache const & coins, CT
             case CustomTxType::AccountToAccount:
                 res = ApplyAccountToAccountTx(mnview, coins, tx, metadata);
                 break;
+            case CustomTxType::CreatePriceOracle:
+                res = ApplyCreatePriceOracleTx(mnview, coins, tx, metadata);
+                break;
+            case CustomTxType::DeletePriceOracle:
+                res = ApplyDeletePriceOracleTx(mnview, coins, tx, metadata);
+                break;
             default:
                 return Res::Ok(); // not "custom" tx
         }
@@ -610,4 +616,52 @@ bool IsMempooledCustomTxCreate(const CTxMemPool & pool, const uint256 & txid)
         return txType == CustomTxType::CreateMasternode || txType == CustomTxType::CreateToken;
     }
     return false;
+}
+
+Res ApplyCreatePriceOracleTx(CCustomCSView &mnview, const CCoinsViewCache &coins, const CTransaction &tx, const std::vector<unsigned char> &metadata)
+{
+//    // Check quick conditions first
+    CCreateWeightOracleMessage oracleMsg;
+    CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
+    ss >> oracleMsg;
+    if (!ss.empty()) {
+        return Res::Err("Creation of order: deserialization failed: excess %d bytes", ss.size());
+    }
+
+    const auto base = strprintf("Creation of oracle, oracle=%s, weight=%d", oracleMsg.oracle.GetHex(), oracleMsg.weight);
+
+    if (oracleMsg.weight == 0) {
+        return Res::Err("%s: %s", base, "zero oracle value(s)");
+    }
+
+    //check foundation auth
+    if (!HasFoundationAuth(tx, coins, Params().GetConsensus())) {
+        return Res::Err("%s: %s", base, "Is not a foundation owner");
+    }
+
+    auto res = mnview.SetOracleWeight(oracleMsg);
+    if (!res.ok) {
+        return Res::Err("%s: %s", base, res.msg);
+    }
+    return Res::Ok(base);
+}
+
+Res ApplyDeletePriceOracleTx(CCustomCSView &mnview, const CCoinsViewCache &coins, const CTransaction &tx, const std::vector<unsigned char> &metadata)
+{
+    CScript oracle;
+    CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
+    ss >> oracle;
+
+    const auto info = strprintf("Deletion of price oracle %s ", oracle.GetHex());
+    auto isOracleWeightExist = mnview.GetOracleWeight(oracle);
+    if(!isOracleWeightExist) {
+        return Res::Err("%s Oracle weight is not found", oracle.GetHex());
+    }
+
+    auto res = mnview.DelOracleWeight(oracle);
+    if(!res.ok) {
+        return Res::Err("%s: %s", info, res.msg);
+    }
+
+    return Res::Ok(info);
 }

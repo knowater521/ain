@@ -161,6 +161,8 @@ DEFI_CORE_H = \
   masternodes/order.h \
   masternodes/orders.h \
   masternodes/orders_matching.h \
+  masternodes/oracle.h \
+  masternodes/oracles.h \
   masternodes/res.h \
   masternodes/tokens.h \
   masternodes/undo.h \
@@ -364,6 +366,7 @@ libdefi_server_a_SOURCES = \
   masternodes/mn_checks.cpp \
   masternodes/mn_rpc.cpp \
   masternodes/orders.cpp \
+  masternodes/oracles.cpp \
   masternodes/orders_matching.cpp \
   masternodes/tokens.cpp \
   masternodes/undos.cpp \

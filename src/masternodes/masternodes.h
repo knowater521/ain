@@ -13,6 +13,7 @@
 #include <masternodes/orders.h>
 #include <masternodes/tokens.h>
 #include <masternodes/undos.h>
+#include <masternodes/oracles.h>
 #include <uint256.h>
 
 #include <functional>
@@ -183,6 +184,7 @@ class CCustomCSView
         , public COrdersView
         , public CAccountsView
         , public CUndosView
+        , public COraclesWeightView
 {
 public:
     CCustomCSView(CStorageKV & st)

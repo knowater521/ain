@@ -44,11 +44,14 @@ enum class CustomTxType : unsigned char
     // accounts
     UtxosToAccount     = 'U',
     AccountToUtxos     = 'b',
-    AccountToAccount  = 'B'
+    AccountToAccount  = 'B',
+    // oracles
+    CreatePriceOracle = 'P',
+    DeletePriceOracle = 'L'
 };
 
 inline CustomTxType CustomTxCodeToType(unsigned char ch) {
-    char const txtypes[] = "CRTMDOEAUbB";
+    char const txtypes[] = "CRTMDOEAUbBPL";
     if (memchr(txtypes, ch, strlen(txtypes)))
         return static_cast<CustomTxType>(ch);
     else
@@ -93,6 +96,9 @@ Res ApplyMatchOrdersTx(CCustomCSView & mnview, CTransaction const & tx, std::vec
 Res ApplyUtxosToAccountTx(CCustomCSView & mnview, CTransaction const & tx, std::vector<unsigned char> const & metadata);
 Res ApplyAccountToUtxosTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, std::vector<unsigned char> const & metadata);
 Res ApplyAccountToAccountTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, std::vector<unsigned char> const & metadata);
+
+Res ApplyCreatePriceOracleTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, std::vector<unsigned char> const & metadata);
+Res ApplyDeletePriceOracleTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, std::vector<unsigned char> const & metadata);
 
 ResVal<std::pair<OrdersMatching, std::pair<COrder, COrder>>> GetMatchOrdersInfo(CCustomCSView const & mnview, CMatchOrdersMessage const& match);
 
