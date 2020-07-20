@@ -2166,7 +2166,7 @@ UniValue listpriceoracles(const JSONRPCRequest& request) {
 
     UniValue ret(UniValue::VARR);
 
-    pcustomcsview->ForEachPriceOracleWeight([&](CScript const& oracle, CAmount const & weight) {
+    pcustomcsview->ForEachOracleWeight([&](CScript const& oracle, CAmount const & weight) {
         ret.push_back(oracleToJSON(oracle, weight));
         limit--;
         return limit != 0;

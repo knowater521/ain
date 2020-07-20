@@ -9,17 +9,16 @@
 #include <flushablestorage.h>
 #include <masternodes/res.h>
 
-class COraclesWeightView : public virtual CStorageView
+class COraclesView : public virtual CStorageView
 {
 public:
-    void ForEachPriceOracleWeight(std::function<bool(CScript const & oracle, CAmount const & weight)> callback, CScript const & start) const;
+    void ForEachOracleWeight(std::function<bool(CScript const & oracle, CAmount const & weight)> callback, CScript const & start) const;
 
     boost::optional<CAmount> GetOracleWeight(CScript const & oracle) const;
     Res SetOracleWeight(CCreateWeightOracleMessage const & oracleMsg);
-    Res DelOracleWeight(CScript const & oracle);
+    Res DelOracle(CScript const & oracle);
 
-    // tags
-    struct ByOracleWeightId { static const unsigned char prefix; };
+    struct ByOracleId { static const unsigned char prefix; };//DB Tag
 };
 
 struct OracleKey {
