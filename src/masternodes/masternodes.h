@@ -73,11 +73,6 @@ public:
 
     //! empty constructor
     CMasternode();
-    //! construct a CMasternode from a CTransaction, at a given height
-//    CMasternode(CTransaction const & tx, int heightIn, std::vector<unsigned char> const & metadata);
-
-    //! constructor helper, runs without any checks
-//    void FromTx(CTransaction const & tx, int heightIn, std::vector<unsigned char> const & metadata);
 
     State GetState() const;
     State GetState(int h) const;

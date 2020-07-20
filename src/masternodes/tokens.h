@@ -83,11 +83,7 @@ public:
         , creationHeight(-1)
         , destructionHeight(-1)
     {}
-    CTokenImplementation(CTransaction const & tx, int heightIn, std::vector<unsigned char> const & metadata);
     ~CTokenImplementation() override = default;
-
-    //! constructor helper, runs without any checks
-    void FromTx(CTransaction const & tx, int heightIn, std::vector<unsigned char> const & metadata);
 
     ADD_SERIALIZE_METHODS;
 
