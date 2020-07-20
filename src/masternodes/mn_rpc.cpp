@@ -256,7 +256,7 @@ UniValue createmasternode(const JSONRPCRequest& request) {
                        },
                },
                RPCResult{
-                       "\"hex\"                  (string) The hex-encoded raw transaction with signature(s)\n"
+                       "\"hash\"                  (string) The hex-encoded hash of broadcasted transaction\n"
                },
                RPCExamples{
                        HelpExampleCli("createmasternode", "\"[{\\\"txid\\\":\\\"id\\\",\\\"vout\\\":0}]\" "
@@ -293,37 +293,8 @@ UniValue createmasternode(const JSONRPCRequest& request) {
     std::string operatorAuthAddressBase58 = metaObj["operatorAuthAddress"].getValStr();
 
     CTxDestination collateralDest = DecodeDestination(collateralAddress);
-    if (collateralDest.which() != 1 && collateralDest.which() != 4) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER,
-                           "collateralAddress (" + collateralAddress + ") does not refer to a P2PKH or P2WPKH address");
-    }
-    CKeyID ownerAuthKey = collateralDest.which() == 1 ? CKeyID(*boost::get<PKHash>(&collateralDest)) : CKeyID(
-            *boost::get<WitnessV0KeyHash>(&collateralDest));
-
-    CTxDestination operatorDest =
-            operatorAuthAddressBase58 == "" ? collateralDest : DecodeDestination(operatorAuthAddressBase58);
-    if (operatorDest.which() != 1 && operatorDest.which() != 4) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "operatorAuthAddress (" + operatorAuthAddressBase58 +
-                                                  ") does not refer to a P2PKH or P2WPKH address");
-    }
-    CKeyID operatorAuthKey = operatorDest.which() == 1 ? CKeyID(*boost::get<PKHash>(&operatorDest)) : CKeyID(
-            *boost::get<WitnessV0KeyHash>(&operatorDest));
-
-    {
-        auto locked_chain = pwallet->chain().lock();
-
-        if (pcustomcsview->GetMasternodeIdByOwner(ownerAuthKey) ||
-            pcustomcsview->GetMasternodeIdByOperator(ownerAuthKey)) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER,
-                               "Masternode with collateralAddress == " + collateralAddress + " already exists");
-        }
-        if (pcustomcsview->GetMasternodeIdByOwner(operatorAuthKey) ||
-            pcustomcsview->GetMasternodeIdByOperator(operatorAuthKey)) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER,
-                               "Masternode with operatorAuthAddress == " + EncodeDestination(operatorDest) +
-                               " already exists");
-        }
-    }
+    CTxDestination operatorDest = operatorAuthAddressBase58 == "" ? collateralDest : DecodeDestination(operatorAuthAddressBase58);
+    CKeyID operatorAuthKey = operatorDest.which() == 1 ? CKeyID(*boost::get<PKHash>(&operatorDest)) : CKeyID(*boost::get<WitnessV0KeyHash>(&operatorDest));
 
     CDataStream metadata(DfTxMarker, SER_NETWORK, PROTOCOL_VERSION);
     metadata << static_cast<unsigned char>(CustomTxType::CreateMasternode)
@@ -339,7 +310,19 @@ UniValue createmasternode(const JSONRPCRequest& request) {
     rawTx.vout.push_back(CTxOut(EstimateMnCreationFee(), scriptMeta));
     rawTx.vout.push_back(CTxOut(GetMnCollateralAmount(), GetScriptForDestination(collateralDest)));
 
-    return fundsignsend(rawTx, request, pwallet);
+    rawTx = fund(rawTx, request, pwallet);
+
+    // check execution
+    {
+        LOCK(cs_main);
+        CCustomCSView mnview_dummy(*pcustomcsview); // don't write into actual DB
+        const auto res = ApplyCreateMasternodeTx(mnview_dummy, CTransaction(rawTx), ::ChainActive().Tip()->height + 1,
+                                      ToByteVector(CDataStream{SER_NETWORK, PROTOCOL_VERSION, static_cast<char>(operatorDest.which()), operatorAuthKey}));
+        if (!res.ok) {
+            throw JSONRPCError(RPC_INVALID_REQUEST, "Execution test failed:\n" + res.msg);
+        }
+    }
+    return signsend(rawTx, request, pwallet)->GetHash().GetHex();
 }
 
 
@@ -366,7 +349,7 @@ UniValue resignmasternode(const JSONRPCRequest& request) {
                        {"mn_id", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The Masternode's ID"},
                },
                RPCResult{
-                       "\"hex\"                      (string) The hex-encoded raw transaction with signature(s)\n"
+                       "\"hash\"                  (string) The hex-encoded hash of broadcasted transaction\n"
                },
                RPCExamples{
                        HelpExampleCli("resignmasternode", "\"[{\\\"txid\\\":\\\"id\\\",\\\"vout\\\":0}]\" \"mn_id\"")
@@ -384,27 +367,12 @@ UniValue resignmasternode(const JSONRPCRequest& request) {
     std::string const nodeIdStr = request.params[1].getValStr();
     uint256 nodeId = uint256S(nodeIdStr);
     CTxDestination ownerDest;
+
     {
         pwallet->BlockUntilSyncedToCurrentChain();
         auto locked_chain = pwallet->chain().lock();
-        auto optIDs = pcustomcsview->AmIOwner();
-        if (!optIDs) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER,
-                               strprintf("You are not the owner of masternode %s, or it does not exist", nodeIdStr));
-        }
-        auto nodePtr = pcustomcsview->GetMasternode(nodeId);
-        if (nodePtr->banHeight != -1) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER,
-                               strprintf("Masternode %s was criminal, banned at height %i by tx %s", nodeIdStr,
-                                         nodePtr->banHeight, nodePtr->banTx.GetHex()));
-        }
 
-        if (nodePtr->resignHeight != -1) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER,
-                               strprintf("Masternode %s was resigned by tx %s; collateral can be spend at block #%d",
-                                         nodeIdStr, nodePtr->resignTx.GetHex(),
-                                         nodePtr->resignHeight + GetMnResignDelay()));
-        }
+        auto nodePtr = pcustomcsview->GetMasternode(nodeId);
         ownerDest = nodePtr->ownerType == 1 ? CTxDestination(PKHash(nodePtr->ownerAuthAddress)) : CTxDestination(
                 WitnessV0KeyHash(nodePtr->ownerAuthAddress));
     }
@@ -421,7 +389,19 @@ UniValue resignmasternode(const JSONRPCRequest& request) {
 
     rawTx.vout.push_back(CTxOut(0, scriptMeta));
 
-    return fundsignsend(rawTx, request, pwallet);
+    rawTx = fund(rawTx, request, pwallet);
+
+    // check execution
+    {
+        LOCK(cs_main);
+        CCustomCSView mnview_dummy(*pcustomcsview); // don't write into actual DB
+        const auto res = ApplyResignMasternodeTx(mnview_dummy, ::ChainstateActive().CoinsTip(), CTransaction(rawTx), ::ChainActive().Tip()->height + 1,
+                                      ToByteVector(CDataStream{SER_NETWORK, PROTOCOL_VERSION, nodeId}));
+        if (!res.ok) {
+            throw JSONRPCError(RPC_INVALID_REQUEST, "Execution test failed:\n" + res.msg);
+        }
+    }
+    return signsend(rawTx, request, pwallet)->GetHash().GetHex();
 }
 
 
@@ -484,13 +464,6 @@ UniValue listmasternodes(const JSONRPCRequest& request) {
     }
 
     auto locked_chain = pwallet->chain().lock();
-
-//    auto it = penhancedDB->NewIterator();
-//    LogPrintf("DUMP:\n");
-//    std::pair<unsigned char, CKeyID> key{};
-//    for (it->Seek(DbTypeToBytes(std::make_pair('o', CKeyID()))); it->Valid() && (BytesToDbType(it->Key(), key), key.first == 'o'); it->Next()) {
-//        LogPrintf("Key: %s Value: %s\n", HexStr(it->Key()).c_str(), HexStr(it->Value()).c_str());
-//    }
 
     UniValue ret(UniValue::VOBJ);
     if (inputs.empty()) {
@@ -585,7 +558,7 @@ UniValue createtoken(const JSONRPCRequest& request) {
                        },
                },
                RPCResult{
-                       "\"hex\"                  (string) The hex-encoded raw transaction with signature(s)\n"
+                       "\"hash\"                  (string) The hex-encoded hash of broadcasted transaction\n"
                },
                RPCExamples{
                        HelpExampleCli("createtoken", "\"[{\\\"txid\\\":\\\"id\\\",\\\"vout\\\":0}]\" "
@@ -629,23 +602,15 @@ UniValue createtoken(const JSONRPCRequest& request) {
                            "collateralAddress (" + collateralAddress + ") does not refer to any valid address");
     }
 
-    std::string symbol = metaObj["symbol"].getValStr().substr(0, CToken::MAX_TOKEN_SYMBOL_LENGTH);
-    if (symbol.size() == 0 || IsDigit(symbol[0])) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER,
-                           "Token symbol '" + symbol + "' should be non-empty and starts with a letter");
-    }
     int height{0};
     {
-        auto locked_chain = pwallet->chain().lock();
-        if (pcustomcsview->GetToken(symbol)) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Token with symbol '" + symbol + "' already exists");
-        }
-        height = ::ChainActive().Height();
+        LOCK(cs_main);
+        height = ::ChainActive().Tip()->height + 1;
     }
 
     CToken token;
-    token.symbol = symbol;
-    token.name = metaObj["name"].getValStr().substr(0, CToken::MAX_TOKEN_NAME_LENGTH);
+    token.symbol = trim_ws(metaObj["symbol"].getValStr()).substr(0, CToken::MAX_TOKEN_SYMBOL_LENGTH);
+    token.name = trim_ws(metaObj["name"].getValStr()).substr(0, CToken::MAX_TOKEN_NAME_LENGTH);
 //    token.decimal = metaObj["name"].get_int(); // fixed for now, check range later
 //    token.limit = metaObj["limit"].get_int(); // fixed for now, check range later
 //    token.flags = metaObj["mintable"].get_bool() ? token.flags | CToken::TokenFlags::Mintable : token.flags; // fixed for now, check later
@@ -665,7 +630,19 @@ UniValue createtoken(const JSONRPCRequest& request) {
     rawTx.vout.push_back(CTxOut(GetTokenCreationFee(height), scriptMeta));
     rawTx.vout.push_back(CTxOut(GetTokenCollateralAmount(), GetScriptForDestination(collateralDest)));
 
-    return fundsignsend(rawTx, request, pwallet);
+    rawTx = fund(rawTx, request, pwallet);
+
+    // check execution
+    {
+        LOCK(cs_main);
+        CCustomCSView mnview_dummy(*pcustomcsview); // don't write into actual DB
+        const auto res = ApplyCreateTokenTx(mnview_dummy, CTransaction(rawTx), height,
+                                      ToByteVector(CDataStream{SER_NETWORK, PROTOCOL_VERSION, token}));
+        if (!res.ok) {
+            throw JSONRPCError(RPC_INVALID_REQUEST, "Execution test failed:\n" + res.msg);
+        }
+    }
+    return signsend(rawTx, request, pwallet)->GetHash().GetHex();
 }
 
 UniValue destroytoken(const JSONRPCRequest& request) {
@@ -687,10 +664,10 @@ UniValue destroytoken(const JSONRPCRequest& request) {
                                 },
                         },
                        },
-                       {"symbol", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The tokens's symbol"},
+                       {"token", RPCArg::Type::STR, RPCArg::Optional::NO, "The tokens's symbol, id or creation tx"},
                },
                RPCResult{
-                       "\"hex\"                      (string) The hex-encoded raw transaction with signature(s)\n"
+                       "\"hash\"                  (string) The hex-encoded hash of broadcasted transaction\n"
                },
                RPCExamples{
                        HelpExampleCli("destroytoken", "\"[{\\\"txid\\\":\\\"id\\\",\\\"vout\\\":0}]\" \"symbol\"")
@@ -705,32 +682,28 @@ UniValue destroytoken(const JSONRPCRequest& request) {
 
     RPCTypeCheck(request.params, {UniValue::VARR, UniValue::VSTR}, true);
 
-    std::string const symbol = request.params[1].getValStr();
+    std::string const tokenStr = trim_ws(request.params[1].getValStr());
     CTxDestination ownerDest;
     uint256 creationTx{};
     {
         pwallet->BlockUntilSyncedToCurrentChain();
         auto locked_chain = pwallet->chain().lock();
-        auto pair = pcustomcsview->GetToken(symbol);
-        if (!pair) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Token %s does not exist!", symbol));
+        DCT_ID id;
+        auto token = pcustomcsview->GetTokenGuessId(tokenStr, id);
+        if (!token) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Token %s does not exist!", tokenStr));
         }
-        if (pair->first < CTokensView::DCT_ID_START) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Token %s is a 'stable coin'", symbol));
-        }
-        auto token = static_cast<CTokenImplementation const& >(*pair->second);
-        if (token.destructionTx != uint256{}) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER,
-                               strprintf("Token %s already destroyed at height %i by tx %s", symbol,
-                                         token.destructionHeight, token.destructionTx.GetHex()));
+        if (id < CTokensView::DCT_ID_START) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Token %s is a 'stable coin'", tokenStr));
         }
         LOCK(pwallet->cs_wallet);
-        auto wtx = pwallet->GetWalletTx(token.creationTx);
+        auto tokenImpl = static_cast<CTokenImplementation const& >(*token);
+        auto wtx = pwallet->GetWalletTx(tokenImpl.creationTx);
         if (!wtx || !ExtractDestination(wtx->tx->vout[1].scriptPubKey, ownerDest)) {
             throw JSONRPCError(RPC_INVALID_PARAMETER,
-                               strprintf("Can't extract destination for token's %s collateral", symbol));
+                               strprintf("Can't extract destination for token's %s collateral", tokenStr));
         }
-        creationTx = token.creationTx;
+        creationTx = tokenImpl.creationTx;
     }
 
     CMutableTransaction rawTx;
@@ -746,7 +719,19 @@ UniValue destroytoken(const JSONRPCRequest& request) {
 
     rawTx.vout.push_back(CTxOut(0, scriptMeta));
 
-    return fundsignsend(rawTx, request, pwallet);
+    rawTx = fund(rawTx, request, pwallet);
+
+    // check execution
+    {
+        LOCK(cs_main);
+        CCustomCSView mnview_dummy(*pcustomcsview); // don't write into actual DB
+        const auto res = ApplyDestroyTokenTx(mnview_dummy, ::ChainstateActive().CoinsTip(), CTransaction(rawTx), ::ChainActive().Tip()->height + 1,
+                                      ToByteVector(CDataStream{SER_NETWORK, PROTOCOL_VERSION, creationTx}));
+        if (!res.ok) {
+            throw JSONRPCError(RPC_INVALID_REQUEST, "Execution test failed:\n" + res.msg);
+        }
+    }
+    return signsend(rawTx, request, pwallet)->GetHash().GetHex();
 }
 
 UniValue tokenToJSON(DCT_ID const& id, CToken const& token, bool verbose) {
@@ -863,7 +848,7 @@ UniValue minttokens(const JSONRPCRequest& request) {
                        },
                },
                RPCResult{
-                       "\"hex\"                      (string) The hex-encoded raw transaction with signature(s)\n"
+                       "\"hash\"                  (string) The hex-encoded hash of broadcasted transaction\n"
                },
                RPCExamples{
                        HelpExampleCli("minttokens",
@@ -1034,7 +1019,7 @@ UniValue createorder(const JSONRPCRequest& request) {
                        },
                },
                RPCResult{
-                       "\"hex\"                  (string) The hex-encoded raw transaction with signature(s)\n"
+                        "\"hash\"                  (string) The hex-encoded hash of broadcasted transaction\n"
                },
                RPCExamples{
                        HelpExampleCli("createorder", "\"[]\" "
@@ -1134,7 +1119,7 @@ UniValue destroyorder(const JSONRPCRequest& request) {
                         "Order owner address. Not required if order is expired."},
                },
                RPCResult{
-                       "\"hex\"                  (string) The hex-encoded raw transaction with signature(s)\n"
+                        "\"hash\"                  (string) The hex-encoded hash of broadcasted transaction\n"
                },
                RPCExamples{
                        HelpExampleCli("destroyorder", "[] order_txid owner_address")
@@ -1217,7 +1202,7 @@ UniValue matchorders(const JSONRPCRequest& request) {
                         "Any valid destination which will take marching rewards"},
                },
                RPCResult{
-                       "\"hex\"                  (string) The hex-encoded raw transaction with signature(s)\n"
+                       "\"hash\"                  (string) The hex-encoded hash of broadcasted transaction\n"
                },
                RPCExamples{
                        HelpExampleCli("matchorders", "[] matcher_address order1_txid "
@@ -1623,7 +1608,7 @@ UniValue utxostoaccount(const JSONRPCRequest& request) {
                        },
                },
                RPCResult{
-                       "\"hex\"                  (string) The hex-encoded raw transaction with signature(s)\n"
+                       "\"hash\"                  (string) The hex-encoded hash of broadcasted transaction\n"
                },
                RPCExamples{
                        HelpExampleCli("utxostoaccount", "[] "
@@ -1711,7 +1696,7 @@ UniValue accounttoaccount(const JSONRPCRequest& request) {
                        },
                },
                RPCResult{
-                       "\"hex\"                  (string) The hex-encoded raw transaction with signature(s)\n"
+                       "\"hash\"                  (string) The hex-encoded hash of broadcasted transaction\n"
                },
                RPCExamples{
                        HelpExampleCli("accounttoaccount", "[] sender_address "
@@ -1801,7 +1786,7 @@ UniValue accounttoutxos(const JSONRPCRequest& request) {
                        }
                },
                RPCResult{
-                       "\"hex\"                  (string) The hex-encoded raw transaction with signature(s)\n"
+                       "\"hash\"                  (string) The hex-encoded hash of broadcasted transaction\n"
                },
                RPCExamples{
                        HelpExampleCli("accounttoutxos", "[] sender_address 100@DFI")

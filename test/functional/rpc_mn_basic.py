@@ -81,15 +81,6 @@ class MasternodesRpcBasicTest (DefiTestFramework):
 
         # RESIGNING:
         #========================
-        # Fail to resign: Forget to place params in config
-        try:
-            self.nodes[0].resignmasternode([], idnode0)
-        except JSONRPCException as e:
-            errorString = e.error['message']
-        assert("You are not the owner" in errorString)
-
-        # Restart with new params, but have no money on ownerauth address
-        self.restart_node(0, extra_args=['-masternode_owner='+collateral0])
         self.nodes[0].generate(1) # to broke "initial block downloading"
         try:
             self.nodes[0].resignmasternode([], idnode0)

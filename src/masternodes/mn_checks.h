@@ -75,12 +75,12 @@ inline void Unserialize(Stream& s, CustomTxType & txType) {
 
 bool HasAuth(CTransaction const & tx, CKeyID const & auth);
 bool HasAuth(CTransaction const & tx, CCoinsViewCache const & coins, CScript const & auth);
-bool HasTokenAuth(CTransaction const & tx, CCoinsViewCache const & coins, uint256 const & tokenTx);
+bool HasCollateralAuth(CTransaction const & tx, CCoinsViewCache const & coins, uint256 const & collateralTx);
 
 Res ApplyCustomTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, const Consensus::Params& consensusParams, uint32_t height, bool isCheck = true);
 //! Deep check (and write)
 Res ApplyCreateMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata);
-Res ApplyResignMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata);
+Res ApplyResignMasternodeTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata);
 
 Res ApplyCreateTokenTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata);
 Res ApplyDestroyTokenTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata);
