@@ -160,6 +160,7 @@ DEFI_CORE_H = \
   masternodes/mn_checks.h \
   masternodes/order.h \
   masternodes/orders.h \
+  masternodes/orders_matching.h \
   masternodes/res.h \
   masternodes/tokens.h \
   masternodes/undo.h \
