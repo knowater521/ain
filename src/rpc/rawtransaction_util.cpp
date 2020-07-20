@@ -72,7 +72,10 @@ ResVal<CTokenAmount> GuessTokenAmount(std::string const & tokenAmount, const int
     }
 }
 
-TokenDestination::TokenDestination(const std::string & output, const interfaces::Chain & chain) {
+TokenDestination::TokenDestination(const std::string & output, const interfaces::Chain & chain)
+    : tokenId(DCT_ID{0})
+    , destination(CNoDestination())
+{
     auto pair = SplitTokenAddress(output);
 
     destination = DecodeDestination(pair.second);

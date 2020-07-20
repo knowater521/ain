@@ -73,15 +73,14 @@ class TokensRpcBasicTest (DefiTestFramework):
         assert_equal(tokens['128']["creationTx"], createTokenTx)
 
         # Check 'listtokens' output
-        t0 = self.nodes[0].listtokens(0)
-        assert_equal(len(t0), 1)
+        assert_equal(len(self.nodes[0].listtokens()), 2)
+        t0 = self.nodes[0].gettoken(0)
         assert_equal(t0['0']['symbol'], "DFI")
-        assert_equal(self.nodes[0].listtokens("DFI"), t0)
-        t128 = self.nodes[0].listtokens(128)
-        assert_equal(len(t128), 1)
+        assert_equal(self.nodes[0].gettoken("DFI"), t0)
+        t128 = self.nodes[0].gettoken(128)
         assert_equal(t128['128']['symbol'], "GOLD")
-        assert_equal(self.nodes[0].listtokens("GOLD"), t128)
-        assert_equal(self.nodes[0].listtokens(createTokenTx), t128)
+        assert_equal(self.nodes[0].gettoken("GOLD"), t128)
+        assert_equal(self.nodes[0].gettoken(createTokenTx), t128)
 
 
         self.sync_blocks(self.nodes[0:2])
