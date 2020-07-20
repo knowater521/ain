@@ -2845,7 +2845,7 @@ static UniValue listunspent(const JSONRPCRequest& request)
                             {"maximumAmount", RPCArg::Type::AMOUNT, /* default */ "unlimited", "Maximum value of each UTXO in " + CURRENCY_UNIT + ""},
                             {"maximumCount", RPCArg::Type::NUM, /* default */ "unlimited", "Maximum number of UTXOs"},
                             {"minimumSumAmount", RPCArg::Type::AMOUNT, /* default */ "unlimited", "Minimum sum value of all UTXOs in " + CURRENCY_UNIT + ""},
-                            {"tokenId", RPCArg::Type::NUM, /* default */ "all", "Filter by token ID"},
+                            {"tokenId", RPCArg::Type::STR, /* default */ "all", "Filter by token (id/symbol/creationTx)"},
                         },
                         "query_options"},
                 },
@@ -2937,8 +2937,14 @@ static UniValue listunspent(const JSONRPCRequest& request)
         if (options.exists("maximumCount"))
             nMaximumCount = options["maximumCount"].get_int64();
 
-        if (options.exists("tokenId"))
-            nOnlyTokensId = options["tokenId"].get_int();
+        DCT_ID tokenId;
+        if (options.exists("tokenId")) {
+            if (pwallet->chain().existTokenGuessId(options["tokenId"].getValStr(), tokenId)) {
+                nOnlyTokensId = tokenId.v;
+            } else {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid token id: ") + options["tokenId"].getValStr());
+            }
+        }
     }
 
     // Make sure the results are valid at least up to the most recent block
