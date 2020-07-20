@@ -253,7 +253,7 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
             }
             CTokenImplementation const & tokenImpl = static_cast<CTokenImplementation const &>(*token);
             // @todo sometimes it doesn't work. please store owner in DB, instead of recovering from UTXO
-            if (!HasTokenAuth(tx, inputs, tokenImpl.creationTx)) {
+            if (!HasCollateralAuth(tx, inputs, tokenImpl.creationTx)) {
                 return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-txns-minttokens-auth",
                     strprintf("missed auth inputs for token id (%s), are you an owner of that token?", tokenId.ToString()));
             }

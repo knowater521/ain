@@ -86,41 +86,6 @@ CMasternode::CMasternode()
 {
 }
 
-//CMasternode::CMasternode(const CTransaction & tx, int heightIn, const std::vector<unsigned char> & metadata)
-//{
-//    FromTx(tx, heightIn, metadata);
-//}
-
-//void CMasternode::FromTx(CTransaction const & tx, int heightIn, std::vector<unsigned char> const & metadata)
-//{
-//    CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
-//    ss >> operatorType;
-//    ss >> operatorAuthAddress;
-
-////    ownerType = 0;
-////    ownerAuthAddress = {};
-
-//    CTxDestination dest;
-//    if (ExtractDestination(tx.vout[1].scriptPubKey, dest)) {
-//        if (dest.which() == 1) {
-//            ownerType = 1;
-//            ownerAuthAddress = CKeyID(*boost::get<PKHash>(&dest));
-//        }
-//        else if (dest.which() == 4) {
-//            ownerType = 4;
-//            ownerAuthAddress = CKeyID(*boost::get<WitnessV0KeyHash>(&dest));
-//        }
-//    }
-
-//    creationHeight = heightIn;
-////    resignHeight = -1;
-////    banHeight = -1;
-
-////    resignTx = {};
-////    banTx = {};
-////    mintedBlocks = 0;
-//}
-
 CMasternode::State CMasternode::GetState() const
 {
     return GetState(::ChainActive().Height());
@@ -336,13 +301,13 @@ boost::optional<std::pair<CKeyID, uint256> > CMasternodesView::AmIOwner() const
 Res CMasternodesView::CreateMasternode(const uint256 & nodeId, const CMasternode & node)
 {
     // Check auth addresses and that there in no MN with such owner or operator
-    if ((node.operatorType != 1 && node.operatorType != 4 && node.ownerType != 1 && node.ownerType != 4) ||
+    if ((node.operatorType != 1 && node.operatorType != 4) || (node.ownerType != 1 && node.ownerType != 4) ||
         node.ownerAuthAddress.IsNull() || node.operatorAuthAddress.IsNull() ||
         GetMasternode(nodeId) ||
-        GetMasternodeIdByOwner(node.ownerAuthAddress) ||
-        GetMasternodeIdByOperator(node.operatorAuthAddress)
+        GetMasternodeIdByOwner(node.ownerAuthAddress)    || GetMasternodeIdByOperator(node.ownerAuthAddress) ||
+        GetMasternodeIdByOwner(node.operatorAuthAddress) || GetMasternodeIdByOperator(node.operatorAuthAddress)
         ) {
-        return Res::Err("bad owner and|or operator address or node exists", nodeId.ToString());
+        return Res::Err("bad owner and|or operator address (should be P2PKH or P2WPKH only) or node with those addresses exists");
     }
 
     WriteBy<ID>(nodeId, node);

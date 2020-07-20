@@ -28,22 +28,6 @@ std::string trim_ws(std::string const & str)
     return str.substr(first, (last - first + 1));
 }
 
-CTokenImplementation::CTokenImplementation(const CTransaction & tx, int heightIn, const std::vector<unsigned char> & metadata)
-{
-    FromTx(tx, heightIn, metadata);
-}
-
-void CTokenImplementation::FromTx(CTransaction const & tx, int heightIn, std::vector<unsigned char> const & metadata)
-{
-    CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
-    ss >> static_cast<CToken &>(*this);
-
-    creationTx = tx.GetHash();
-    creationHeight = heightIn;
-    destructionTx = {};
-    destructionHeight = -1;
-}
-
 void CStableTokens::Initialize(CStableTokens & dst)
 {
     // Default CToken()

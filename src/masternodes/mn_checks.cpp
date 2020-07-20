@@ -69,6 +69,7 @@ CPubKey GetPubkeyFromScriptSig(CScript const & scriptSig)
     return CPubKey(data);
 }
 
+// not used for now (cause works only with signed inputs)
 bool HasAuth(CTransaction const & tx, CKeyID const & auth)
 {
     for (auto input : tx.vin)
@@ -97,9 +98,9 @@ bool HasAuth(CTransaction const & tx, CCoinsViewCache const & coins, CScript con
     return false;
 }
 
-bool HasTokenAuth(CTransaction const & tx, CCoinsViewCache const & coins, uint256 const & tokenTx)
+bool HasCollateralAuth(CTransaction const & tx, CCoinsViewCache const & coins, uint256 const & collateralTx)
 {
-    const Coin& auth = coins.AccessCoin(COutPoint(tokenTx, 1));
+    const Coin& auth = coins.AccessCoin(COutPoint(collateralTx, 1)); // always n=1 output
     return HasAuth(tx, coins, auth.out.scriptPubKey);
 }
 
@@ -114,7 +115,6 @@ bool HasFoundationAuth(CTransaction const & tx, CCoinsViewCache const & coins, C
     return false;
 }
 
-// @todo get rid of "is check" argument and logging inside of this function
 Res ApplyCustomTx(CCustomCSView & base_mnview, CCoinsViewCache const & coins, CTransaction const & tx, Consensus::Params const & consensusParams, uint32_t height, bool isCheck)
 {
     Res res = Res::Ok();
@@ -132,10 +132,10 @@ Res ApplyCustomTx(CCustomCSView & base_mnview, CCoinsViewCache const & coins, CT
         switch (guess)
         {
             case CustomTxType::CreateMasternode:
-                res = ApplyCreateMasternodeTx(mnview, tx, height, metadata); // @todo return Res
+                res = ApplyCreateMasternodeTx(mnview, tx, height, metadata);
                 break;
             case CustomTxType::ResignMasternode:
-                res = ApplyResignMasternodeTx(mnview, tx, height, metadata);
+                res = ApplyResignMasternodeTx(mnview, coins, tx, height, metadata);
                 break;
             case CustomTxType::CreateToken:
                 res = ApplyCreateTokenTx(mnview, tx, height, metadata);
@@ -203,7 +203,7 @@ Res ApplyCreateMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uin
         tx.vout[0].nValue < GetMnCreationFee(height) || tx.vout[0].nTokenId != DCT_ID{0} ||
         tx.vout[1].nValue != GetMnCollateralAmount() || tx.vout[1].nTokenId != DCT_ID{0}
         ) {
-        return Res::Err("%s: %s", base, "malformed tx vouts");
+        return Res::Err("%s: %s", base, "malformed tx vouts (wrong creation fee or collateral amount)");
     }
 
     CMasternode node;
@@ -234,7 +234,7 @@ Res ApplyCreateMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uin
     return Res::Ok(base);
 }
 
-Res ApplyResignMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, const std::vector<unsigned char> & metadata)
+Res ApplyResignMasternodeTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, const std::vector<unsigned char> & metadata)
 {
     const std::string base{"Resigning of masternode"};
 
@@ -246,7 +246,7 @@ Res ApplyResignMasternodeTx(CCustomCSView & mnview, CTransaction const & tx, uin
     if (!node) {
         return Res::Err("%s: node %s does not exist", base, nodeId.ToString());
     }
-    if (!HasAuth(tx, node->ownerAuthAddress)) {
+    if (!HasCollateralAuth(tx, coins, nodeId)) {
         return Res::Err("%s %s: %s", base, nodeId.ToString(), "tx must have at least one input from masternode owner");
     }
 
@@ -265,9 +265,23 @@ Res ApplyCreateTokenTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t
         tx.vout[0].nValue < GetTokenCreationFee(height) || tx.vout[0].nTokenId != DCT_ID{0} ||
         tx.vout[1].nValue != GetTokenCollateralAmount() || tx.vout[1].nTokenId != DCT_ID{0}
         ) {
-        return Res::Err("%s: %s", base, "malformed tx vouts");
+        return Res::Err("%s: %s", base, "malformed tx vouts (wrong creation fee or collateral amount)");
     }
-    CTokenImplementation token(tx, height, metadata);
+
+    CTokenImplementation token;
+    CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
+    ss >> static_cast<CToken &>(token);
+    if (!ss.empty()) {
+        return Res::Err("%s: deserialization failed: excess %d bytes", base,  ss.size());
+    }
+    token.symbol = trim_ws(token.symbol).substr(0, CToken::MAX_TOKEN_SYMBOL_LENGTH);
+    if (token.symbol.size() == 0 || IsDigit(token.symbol[0])) {
+        return Res::Err("token symbol '%s' should be non-empty and starts with a letter", token.symbol);
+    }
+    token.name = trim_ws(token.name).substr(0, CToken::MAX_TOKEN_NAME_LENGTH);
+
+    token.creationTx = tx.GetHash();
+    token.creationHeight = height;
 
     auto res = mnview.CreateToken(token);
     if (!res.ok) {
@@ -290,7 +304,7 @@ Res ApplyDestroyTokenTx(CCustomCSView & mnview, CCoinsViewCache const & coins, C
         return Res::Err("%s: token with creationTx %s does not exist", base, tokenTx.ToString());
     }
     CTokenImplementation const & token = pair->second;
-    if (!HasTokenAuth(tx, coins, token.creationTx)) {
+    if (!HasCollateralAuth(tx, coins, token.creationTx)) {
         return Res::Err("%s: %s", base, "tx must have at least one input from token owner");
     }
 
