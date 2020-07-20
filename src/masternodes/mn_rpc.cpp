@@ -1892,7 +1892,7 @@ UniValue oracleToJSON(const CScript &oracle, CAmount const& val) {
     return obj;
 }
 
-UniValue createpriceoracle(const JSONRPCRequest& request) {
+UniValue createoracle(const JSONRPCRequest& request) {
     CWallet* const pwallet = GetWallet(request);
 
     auto h = RPCHelpMan{"createpriceoracle",
@@ -1998,7 +1998,7 @@ UniValue createpriceoracle(const JSONRPCRequest& request) {
     return signsend(rawTx, request, pwallet)->GetHash().GetHex();
 }
 
-UniValue deletepriceoracle(const JSONRPCRequest& request) {
+UniValue deleteoracle(const JSONRPCRequest& request) {
     CWallet* const pwallet = GetWallet(request);
 
     auto h = RPCHelpMan{"deletepriceoracle",
@@ -2085,7 +2085,7 @@ UniValue deletepriceoracle(const JSONRPCRequest& request) {
     return signsend(rawTx, request, pwallet)->GetHash().GetHex();
 }
 
-UniValue getpriceoracle(const JSONRPCRequest& request) {
+UniValue getoracle(const JSONRPCRequest& request) {
     RPCHelpMan{"getpriceoracle",
                "\nReturns information about oracles.\n",
                {
@@ -2109,7 +2109,7 @@ UniValue getpriceoracle(const JSONRPCRequest& request) {
     throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Oracle not found");
 }
 
-UniValue listpriceoracles(const JSONRPCRequest& request) {
+UniValue listoracles(const JSONRPCRequest& request) {
     RPCHelpMan{"listpriceoracles",
                "\nReturns information about oracles.\n",
                {
@@ -2413,10 +2413,10 @@ static const CRPCCommand commands[] =
                 {"accounts",    "utxostoaccount",     &utxostoaccount,     {"inputs", "amounts"}},
                 {"accounts",    "accounttoaccount",   &accounttoaccount,   {"inputs", "sender", "to"}},
                 {"accounts",    "accounttoutxos",     &accounttoutxos,     {"inputs", "sender", "to"}},
-                {"oracles",     "createpriceoracle",  &createpriceoracle,  {"inputs", "metadata"}},
-                {"oracles",     "deletepriceoracle",  &deletepriceoracle,  {"inputs", "oracle"}},
-                {"oracles",     "getpriceoracle",     &getpriceoracle,     {"oracle"}},
-                {"oracles",     "listpriceoracles",   &listpriceoracles,   {"pagination"}},
+                {"oracles",     "createoracle",       &createoracle,       {"inputs", "metadata"}},
+                {"oracles",     "deleteoracle",       &deleteoracle,       {"inputs", "oracle"}},
+                {"oracles",     "getoracle",          &getoracle,          {"oracle"}},
+                {"oracles",     "listoracles",        &listoracles,        {"pagination"}},
                 {"oracles",     "postprices",         &postprices,         {"inputs", "metadata"}},
                 {"oracles",     "getprice",           &getprice,           {"oracle"}},
                 {"oracles",     "listprices",         &listprices,         {"pagination"}},
