@@ -184,7 +184,8 @@ class CCustomCSView
         , public COrdersView
         , public CAccountsView
         , public CUndosView
-        , public COraclesWeightView
+        , public COraclesView
+        , public COraclesPriceView
 {
 public:
     CCustomCSView(CStorageKV & st)

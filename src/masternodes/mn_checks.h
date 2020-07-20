@@ -47,11 +47,12 @@ enum class CustomTxType : unsigned char
     AccountToAccount  = 'B',
     // oracles
     CreatePriceOracle = 'P',
-    DeletePriceOracle = 'L'
+    DeletePriceOracle = 'L',
+    PostPrices = 'Q'
 };
 
 inline CustomTxType CustomTxCodeToType(unsigned char ch) {
-    char const txtypes[] = "CRTMDOEAUbBPL";
+    char const txtypes[] = "CRTMDOEAUbBPLQ";
     if (memchr(txtypes, ch, strlen(txtypes)))
         return static_cast<CustomTxType>(ch);
     else
@@ -99,6 +100,7 @@ Res ApplyAccountToAccountTx(CCustomCSView & mnview, CCoinsViewCache const & coin
 
 Res ApplyCreatePriceOracleTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, std::vector<unsigned char> const & metadata);
 Res ApplyDeletePriceOracleTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, std::vector<unsigned char> const & metadata);
+Res ApplyPostPricesTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata);
 
 ResVal<std::pair<OrdersMatching, std::pair<COrder, COrder>>> GetMatchOrdersInfo(CCustomCSView const & mnview, CMatchOrdersMessage const& match);
 

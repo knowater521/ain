@@ -170,6 +170,9 @@ Res ApplyCustomTx(CCustomCSView & base_mnview, CCoinsViewCache const & coins, CT
             case CustomTxType::DeletePriceOracle:
                 res = ApplyDeletePriceOracleTx(mnview, coins, tx, metadata);
                 break;
+            case CustomTxType::PostPrices:
+                res = ApplyPostPricesTx(mnview, coins, tx, height, metadata);
+                break;
             default:
                 return Res::Ok(); // not "custom" tx
         }
@@ -625,7 +628,7 @@ Res ApplyCreatePriceOracleTx(CCustomCSView &mnview, const CCoinsViewCache &coins
     CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
     ss >> oracleMsg;
     if (!ss.empty()) {
-        return Res::Err("Creation of order: deserialization failed: excess %d bytes", ss.size());
+        return Res::Err("Creation of oracle: deserialization failed: excess %d bytes", ss.size());
     }
 
     const auto base = strprintf("Creation of oracle, oracle=%s, weight=%d", oracleMsg.oracle.GetHex(), oracleMsg.weight);
@@ -658,10 +661,42 @@ Res ApplyDeletePriceOracleTx(CCustomCSView &mnview, const CCoinsViewCache &coins
         return Res::Err("%s Oracle weight is not found", oracle.GetHex());
     }
 
-    auto res = mnview.DelOracleWeight(oracle);
+    auto res = mnview.DelOracle(oracle);
     if(!res.ok) {
         return Res::Err("%s: %s", info, res.msg);
     }
 
     return Res::Ok(info);
+}
+
+Res ApplyPostPricesTx(CCustomCSView &mnview, const CCoinsViewCache &coins, const CTransaction &tx, uint32_t height, const std::vector<unsigned char> &metadata)
+{
+    // Check quick conditions first
+    CPostPriceOracleTokenID postPricesMsg;
+    CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
+    ss >> postPricesMsg;
+
+    if (!ss.empty()) {
+        return Res::Err("Post Prices: deserialization failed: excess %d bytes", ss.size());
+    }
+
+    const auto oracleWeight = mnview.GetOracleWeight(postPricesMsg.oracle);
+    if (oracleWeight) {
+
+        const auto base = strprintf("Post Prices, if price is 0 then delete, oracle=%s, tokenID=%d, price=%d", postPricesMsg.oracle.GetHex(), postPricesMsg.tokenID, postPricesMsg.price);
+
+        // check auth
+        if (!HasAuth(tx, coins, postPricesMsg.oracle)) {
+            return Res::Err("%s: %s", base, "tx must have at least one input from oracle owner");
+        }
+
+        auto res = mnview.SetOracleTokenIDPrice(postPricesMsg);
+        if (!res.ok) {
+            return Res::Err("%s: %s", base, res.msg);
+        }
+
+        return Res::Ok(base);
+    }
+
+    return Res::Err("Oracle weight is 0 or Oracle doesn't exist");
 }

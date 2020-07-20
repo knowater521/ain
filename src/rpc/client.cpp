@@ -221,10 +221,13 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "spv_listanchors", 2, "minConfs" },
     { "spv_listanchors", 3, "maxConfs" },
 
-    { "createpriceoracle", 0, "inputs" },
-    { "createpriceoracle", 1, "metadata" },
-    { "deletepriceoracle", 0, "inputs" },
-    { "listpriceoracles", 0, "pagination" },
+    { "createoracle", 0, "inputs" },
+    { "createoracle", 1, "metadata" },
+    { "deleteoracle", 0, "inputs" },
+    { "listoracles", 0, "pagination" },
+    { "postprices", 0, "inputs" },
+    { "postprices", 1, "metadata" },
+    { "listprices", 0, "pagination" },
 };
 // clang-format on
 
