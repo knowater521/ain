@@ -22,29 +22,54 @@ public:
 };
 
 struct OracleKey {
+    DCT_ID tokenID;
     CScript oracle;
-    uint32_t tokenID;
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
+        READWRITE(VARINT(tokenID.v));
         READWRITE(oracle);
-        READWRITE(tokenID);
     }
 };
+
+struct OracleValue
+{
+    CAmount price;
+    uint32_t timeInForce; // expiry time in blocks
+    uint32_t height;
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        READWRITE(price);
+        READWRITE(timeInForce);
+        READWRITE(height);
+    }
+};
+
 
 class COraclesPriceView : public virtual CStorageView
 {
 public:
-    void ForEachPrice(std::function<bool(OracleKey const & oracleKey, CAmount const & price)> callback, OracleKey const & startKey) const;
+    void ForEachPrice(std::function<bool(OracleKey const & oracleKey, OracleValue const & oracleValue)> callback, OracleKey const & startKey) const;
 
-    Res SetOracleTokenIDPrice(CPostPriceOracleTokenID const & oracleMsg);
-    boost::optional<CAmount> GetPrice(OracleKey const & oracleKey) const;
+    Res SetOracleTokenIDPrice(CPostPriceOracle const & oracleMsg);
+    boost::optional<OracleValue> GetOraclePrice(OracleKey const & oracleKey) const;
 
     struct ByOracleTokenId { static const unsigned char prefix; };//tag in DB
 };
 
+class CMedianPriceView : public virtual CStorageView
+{
+public:
+    void ForEachMedian(std::function<bool(DCT_ID const& tokenID, CAmount const& medianPrice)> callback, DCT_ID const & startID) const;
 
+    Res SetTokenIdMedian(DCT_ID const& tokenID, CAmount const& medianPrice);
+
+    struct ByTokenId { static const unsigned char prefix; };
+};
 
 #endif //DEFI_MASTERNODES_ORACLES_H

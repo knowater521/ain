@@ -228,6 +228,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "postprices", 0, "inputs" },
     { "postprices", 1, "metadata" },
     { "listprices", 0, "pagination" },
+    { "listmedianprices", 0, "pagination" },
 };
 // clang-format on
 

@@ -661,6 +661,12 @@ Res ApplyDeletePriceOracleTx(CCustomCSView &mnview, const CCoinsViewCache &coins
         return Res::Err("%s Oracle weight is not found", oracle.GetHex());
     }
 
+    const auto base = strprintf("Deletion of oracle, oracle=%s", oracle.GetHex());
+    if(!(HasFoundationAuth(tx, coins, Params().GetConsensus()) || HasAuth(tx, coins, oracle)))
+    {
+        return Res::Err("%s: %s", base, "Is not a foundation owner or a current oracle");
+    }
+
     auto res = mnview.DelOracle(oracle);
     if(!res.ok) {
         return Res::Err("%s: %s", info, res.msg);
@@ -672,7 +678,7 @@ Res ApplyDeletePriceOracleTx(CCustomCSView &mnview, const CCoinsViewCache &coins
 Res ApplyPostPricesTx(CCustomCSView &mnview, const CCoinsViewCache &coins, const CTransaction &tx, uint32_t height, const std::vector<unsigned char> &metadata)
 {
     // Check quick conditions first
-    CPostPriceOracleTokenID postPricesMsg;
+    CPostPriceOracle postPricesMsg;
     CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
     ss >> postPricesMsg;
 
@@ -683,20 +689,22 @@ Res ApplyPostPricesTx(CCustomCSView &mnview, const CCoinsViewCache &coins, const
     const auto oracleWeight = mnview.GetOracleWeight(postPricesMsg.oracle);
     if (oracleWeight) {
 
-        const auto base = strprintf("Post Prices, if price is 0 then delete, oracle=%s, tokenID=%d, price=%d", postPricesMsg.oracle.GetHex(), postPricesMsg.tokenID, postPricesMsg.price);
+        const auto base = strprintf("Post Prices, if price is 0 then delete, oracle=%s, tokenID=%s, price=%d", postPricesMsg.oracle.GetHex(), postPricesMsg.tokenID.ToString(), postPricesMsg.price);
 
         // check auth
         if (!HasAuth(tx, coins, postPricesMsg.oracle)) {
             return Res::Err("%s: %s", base, "tx must have at least one input from oracle owner");
         }
+        postPricesMsg.height = height;//setting height here!
+        postPricesMsg.timeInForce = postPricesMsg.timeInForce - height;
 
-        auto res = mnview.SetOracleTokenIDPrice(postPricesMsg);
-        if (!res.ok) {
-            return Res::Err("%s: %s", base, res.msg);
+        if (postPricesMsg.timeInForce > 0) {
+            auto res = mnview.SetOracleTokenIDPrice(postPricesMsg);
+            if (!res.ok) {
+                return Res::Err("%s: %s", base, res.msg);
+            }
         }
-
         return Res::Ok(base);
     }
-
-    return Res::Err("Oracle weight is 0 or Oracle doesn't exist");
+    return Res::Err("Oracle doesn't exist");
 }

@@ -7,6 +7,7 @@
 /// @attention make sure that it does not overlap with those in masternodes.cpp/tokens.cpp/undos.cpp/accounts.cpp/orders.cpp !!!
 const unsigned char COraclesView::ByOracleId::prefix = 'p';
 const unsigned char COraclesPriceView::ByOracleTokenId::prefix = 'q';
+const unsigned char CMedianPriceView::ByTokenId::prefix = 's';
 
 void COraclesView::ForEachOracleWeight(std::function<bool (const CScript & oracle, const CAmount & weight)> callback, const CScript &start) const
 {
@@ -30,24 +31,37 @@ Res COraclesView::DelOracle(CScript const & oracle) {
     return Res::Ok();
 }
 
-void COraclesPriceView::ForEachPrice(std::function<bool (const OracleKey & oracleKey, const CAmount & price)> callback, const OracleKey &startKey) const
+void COraclesPriceView::ForEachPrice(std::function<bool (const OracleKey & oracleKey, const OracleValue & oracleValue)> callback, const OracleKey &startKey) const
 {
-    ForEach<ByOracleTokenId, OracleKey, CAmount>([&callback] (const OracleKey & oracleKey, const CAmount & price) {
-        return callback(oracleKey, price);
+    ForEach<ByOracleTokenId, OracleKey, OracleValue>([&callback] (const OracleKey & oracleKey, const OracleValue & oracleValue) {
+        return callback(oracleKey, oracleValue);
     }, startKey);
 }
 
-Res COraclesPriceView::SetOracleTokenIDPrice(const CPostPriceOracleTokenID &oracleMsg)
+Res COraclesPriceView::SetOracleTokenIDPrice(const CPostPriceOracle &oracleMsg)
 {
     if (oracleMsg.price != 0) {
-        WriteBy<ByOracleTokenId>(OracleKey{oracleMsg.oracle, oracleMsg.tokenID}, oracleMsg.price);
+        WriteBy<ByOracleTokenId>(OracleKey{oracleMsg.tokenID, oracleMsg.oracle}, OracleValue{oracleMsg.price, oracleMsg.timeInForce, oracleMsg.height});
     } else {
-        EraseBy<ByOracleTokenId>(OracleKey{oracleMsg.oracle, oracleMsg.tokenID});
+        EraseBy<ByOracleTokenId>(OracleKey{oracleMsg.tokenID, oracleMsg.oracle});
     }
     return Res::Ok();
 }
 
-boost::optional<CAmount> COraclesPriceView::GetPrice(const OracleKey &oracleKey) const
+boost::optional<OracleValue> COraclesPriceView::GetOraclePrice(const OracleKey &oracleKey) const
 {
-    return ReadBy<ByOracleTokenId, CAmount>(oracleKey);
+    return ReadBy<ByOracleTokenId, OracleValue>(oracleKey);
+}
+
+void CMedianPriceView::ForEachMedian(std::function<bool (DCT_ID const& tokenID, CAmount const& medianPrice)> callback, const DCT_ID &startID) const
+{
+    ForEach<ByTokenId, DCT_ID, CAmount>([&callback] (DCT_ID const& tokenID, CAmount const& medianPrice) {
+        return callback(tokenID, medianPrice);
+    }, startID);
+}
+
+Res CMedianPriceView::SetTokenIdMedian(const DCT_ID &tokenID, const CAmount &medianPrice)
+{
+    WriteBy<ByTokenId>(tokenID, medianPrice);
+    return Res::Ok();
 }

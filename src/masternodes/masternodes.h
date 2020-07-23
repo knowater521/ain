@@ -186,6 +186,7 @@ class CCustomCSView
         , public CUndosView
         , public COraclesView
         , public COraclesPriceView
+        , public CMedianPriceView
 {
 public:
     CCustomCSView(CStorageKV & st)
@@ -212,6 +213,8 @@ public:
     CStorageKV& GetRaw() {
         return DB();
     }
+
+    void CalcMedianPrices(uint32_t height);
 };
 
 /** Global DB and view that holds enhanced chainstate data (should be protected by cs_main) */

@@ -29,23 +29,25 @@ struct CCreateWeightOracleMessage
     }
 };
 
-struct CPostPriceOracleTokenID
+struct CPostPriceOracle
 {
     CScript oracle;
-    uint32_t tokenID;//DFI 0, foundation members up to 127, 128+ for other users
+    DCT_ID tokenID;//DFI 0, foundation members up to 127, 128+ for other users
     CAmount price;
     uint32_t timeInForce; // expiry time in blocks
+    uint32_t height;
 
-    virtual ~CPostPriceOracleTokenID() = default;
+    virtual ~CPostPriceOracle() = default;
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(oracle);
-        READWRITE(tokenID);
+        READWRITE(VARINT(tokenID.v));
         READWRITE(price);
         READWRITE(timeInForce);
+        READWRITE(height);
     }
 };
 
