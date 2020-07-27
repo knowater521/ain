@@ -10,6 +10,7 @@
 #include <map>
 #include <masternodes/res.h>
 #include <rpc/request.h>
+#include <masternodes/balances.h>
 
 class FillableSigningProvider;
 class UniValue;
@@ -21,21 +22,17 @@ namespace interfaces {
 class Chain;
 }
 
-std::pair<std::string, std::string> SplitTokenAddress(std::string const & output);
+std::pair<std::string, std::string> SplitAmount(std::string const & output);
 
 ResVal<std::pair<CAmount, std::string>> ParseTokenAmount(std::string const & tokenAmount);
-ResVal<CTokenAmount> GuessTokenAmount(std::string const & tokenAmount, const interfaces::Chain & chain);
+ResVal<CTokenAmount> GuessTokenAmount(interfaces::Chain const & chain,std::string const & tokenAmount);
+
+CScript DecodeScript(std::string const& str);
+CTokenAmount DecodeAmount(interfaces::Chain const & chain, UniValue const& amountUni, std::string const& name);
+CBalances DecodeAmounts(interfaces::Chain const & chain, UniValue const& amountsUni, std::string const& name);
+std::map<CScript, CBalances> DecodeRecipients(interfaces::Chain const & chain, UniValue const& sendTo);
 
 std::function<void(std::string)> JSONRPCErrorThrower(int code, const std::string& prefix);
-
-struct TokenDestination
-{
-    DCT_ID tokenId;
-    CTxDestination destination;
-
-    TokenDestination(std::string const & output, interfaces::Chain const & chain);
-    inline bool operator< (const TokenDestination& rhs) const { return tokenId < rhs.tokenId || (tokenId == rhs.tokenId ? destination < rhs.destination : false ); }
-};
 
 /**
  * Sign a transaction with the given keystore and previous transactions
