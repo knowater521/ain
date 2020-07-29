@@ -14,6 +14,7 @@ class COrdersView : public virtual CStorageView
 {
 public:
     void ForEachOrder(std::function<bool(uint256 const & orderTx, COrder const & order)> callback, uint256 const & start) const;
+    void ForEachExpiredOrder(std::function<bool(uint256 const & orderTx)> callback, uint32_t expiryHeight) const;
 
     boost::optional<COrder> GetOrder(uint256 const & orderTx) const;
     Res SetOrder(uint256 const & orderTx, COrder const & order);
@@ -21,6 +22,21 @@ public:
 
     // tags
     struct ByCreationTx { static const unsigned char prefix; };
+    struct ByExpiryHeight { static const unsigned char prefix; };
+
+    struct ExpiredKey {
+        uint32_t height;
+        uint256 orderTx;
+
+        ADD_SERIALIZE_METHODS;
+
+        template <typename Stream, typename Operation>
+        inline void SerializationOp(Stream& s, Operation ser_action) {
+            READWRITE(height);
+            READWRITE(orderTx);
+        }
+    };
 };
+
 
 #endif //DEFI_MASTERNODES_ORDERS_H
