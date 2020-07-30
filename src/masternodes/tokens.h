@@ -1,4 +1,4 @@
-// Copyright (c) 2019 The DeFi Foundation
+﻿// Copyright (c) 2019 The DeFi Foundation
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -27,6 +27,7 @@ public:
         None = 0,
         Mintable = 0x01,
         Tradeable = 0x02,
+        isDAT = 0x04,
         Default = TokenFlags::Mintable | TokenFlags::Tradeable
     };
 
@@ -53,6 +54,10 @@ public:
     bool IsTradeable() const
     {
         return flags & (uint8_t)TokenFlags::Tradeable;
+    }
+    bool IsDAT() const
+    {
+        return flags & (uint8_t)TokenFlags::isDAT;
     }
 
     ADD_SERIALIZE_METHODS;

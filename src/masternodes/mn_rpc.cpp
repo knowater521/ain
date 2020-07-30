@@ -1581,7 +1581,7 @@ UniValue getaccount(const JSONRPCRequest& request) {
                         {
                                 {"start", RPCArg::Type::STR, RPCArg::Optional::OMITTED,
                                  "Optional first key to iterate from, in lexicographical order."
-                                 "Typically it's set to last tokenID from previous request."},
+                                 "Typically it's set to last tokenid from previous request."},
                                 {"including_start", RPCArg::Type::BOOL, RPCArg::Optional::OMITTED,
                                  "If true, then iterate including starting position. False by default"},
                                 {"limit", RPCArg::Type::NUM, RPCArg::Optional::OMITTED,
@@ -1983,7 +1983,7 @@ UniValue createoracle(const JSONRPCRequest& request) {
     RPCTypeCheck(request.params, {UniValue::VARR, UniValue::VOBJ}, false);
     UniValue metaObj = request.params[1].get_obj();
     if (metaObj["oracle"].isNull() || metaObj["weight"].isNull()) {
-        throw std::runtime_error(h.ToString());
+        throw JSONRPCError(RPC_INVALID_PARAMS, "Oracle or weight is Null");
     }
 
     CCreateWeightOracleMessage msg{};
@@ -2000,9 +2000,7 @@ UniValue createoracle(const JSONRPCRequest& request) {
     CMutableTransaction rawTx;
     rawTx.vout.push_back(CTxOut(0, scriptMeta));
 
-
-    bool isFoundationMember = false;
-    for(std::set<CScript>::iterator it = Params().GetConsensus().foundationMembers.begin(); it != Params().GetConsensus().foundationMembers.end() && isFoundationMember == false; it++)
+    for(std::set<CScript>::iterator it = Params().GetConsensus().foundationMembers.begin(); it != Params().GetConsensus().foundationMembers.end() && rawTx.vin.size() == 0; it++)
     {
         if(IsMine(*pwallet, *it) == ISMINE_SPENDABLE)
         {
@@ -2012,13 +2010,12 @@ UniValue createoracle(const JSONRPCRequest& request) {
             }
             try {
                 rawTx.vin = GetAuthInputs(pwallet, destination, request.params[0].get_array());
-                isFoundationMember = true;
             }
-            catch (const UniValue& objError) {
-                throw std::runtime_error(find_value(objError, "message").get_str());
-            }
+            catch (const UniValue& objError) {}
         }
     }
+    if(rawTx.vin.size() == 0)
+        throw JSONRPCError(RPC_INVALID_REQUEST, "Incorrect Authorization");
 
     // fund
     rawTx = fund(rawTx, request, pwallet);
@@ -2079,7 +2076,7 @@ UniValue deleteoracle(const JSONRPCRequest& request) {
 
     RPCTypeCheck(request.params, {UniValue::VARR, UniValue::VSTR}, false);
     if (request.params[1].isNull()) {
-        throw std::runtime_error(h.ToString());
+        throw JSONRPCError(RPC_INVALID_PARAMS, h.ToString());
     }
 
     // encode
@@ -2093,8 +2090,16 @@ UniValue deleteoracle(const JSONRPCRequest& request) {
     CMutableTransaction rawTx;
     rawTx.vout.push_back(CTxOut(0, scriptMeta));
 
-    bool isFoundationMember = false;
-    for(std::set<CScript>::iterator it = Params().GetConsensus().foundationMembers.begin(); it != Params().GetConsensus().foundationMembers.end() && isFoundationMember == false; it++)
+    CTxDestination destination;
+    if (!ExtractDestination(msg, destination)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid oracle destination");
+    }
+    try {
+        rawTx.vin = GetAuthInputs(pwallet, destination, request.params[0].get_array());
+    }
+    catch (const UniValue& objError) {}
+
+    for(std::set<CScript>::iterator it = Params().GetConsensus().foundationMembers.begin(); it != Params().GetConsensus().foundationMembers.end() && rawTx.vin.size() == 0; it++)
     {
         if(IsMine(*pwallet, *it) == ISMINE_SPENDABLE)
         {
@@ -2104,13 +2109,12 @@ UniValue deleteoracle(const JSONRPCRequest& request) {
             }
             try {
                 rawTx.vin = GetAuthInputs(pwallet, destination, request.params[0].get_array());
-                isFoundationMember = true;
             }
-            catch (const UniValue& objError) {
-                throw std::runtime_error(find_value(objError, "message").get_str());
-            }
+            catch (const UniValue& objError) {}
         }
     }
+    if(rawTx.vin.size() == 0)
+        throw JSONRPCError(RPC_INVALID_REQUEST, "Incorrect Authorization");
 
     // fund
     rawTx = fund(rawTx, request, pwallet);
@@ -2146,6 +2150,7 @@ UniValue getoracle(const JSONRPCRequest& request) {
 
     CScript oracle = DecodeScript(request.params[0].get_str());
 
+    LOCK(cs_main);
     const auto oracleWeight = pcustomcsview->GetOracleWeight(oracle);
     if (oracleWeight) {
         return oracleToJSON(oracle, *oracleWeight);
@@ -2210,6 +2215,7 @@ UniValue listoracles(const JSONRPCRequest& request) {
 
     UniValue ret(UniValue::VARR);
 
+    LOCK(cs_main);
     pcustomcsview->ForEachOracleWeight([&](CScript const& oracle, CAmount const & weight) {
         ret.push_back(oracleToJSON(oracle, weight));
         limit--;
@@ -2243,7 +2249,7 @@ UniValue postprices(const JSONRPCRequest& request) {
                                 {"oracle", RPCArg::Type::STR, RPCArg::Optional::NO,
                                  "Address (script pub key) which is authorized to post prices \"string\""},
                                 {"tokenid", RPCArg::Type::NUM, RPCArg::Optional::NO,
-                                 "TokenID number, 0 for DFI \"number\""},
+                                 "tokenid number, 0 for DFI \"number\""},
                                 {"price", RPCArg::Type::NUM, RPCArg::Optional::NO,
                                  "Set price for token with TokenID \"number\""},
                                 {"timeinforce", RPCArg::Type::NUM, RPCArg::Optional::NO,
@@ -2271,7 +2277,7 @@ UniValue postprices(const JSONRPCRequest& request) {
 
     RPCTypeCheck(request.params, {UniValue::VARR, UniValue::VOBJ}, false);
     UniValue metaObj = request.params[1].get_obj();
-    if (metaObj["oracle"].isNull() || metaObj["tokenid"].isNull() || metaObj["price"].isNull() || metaObj["timeinforce"].get_int() <= 0) {
+    if (metaObj["oracle"].isNull() || metaObj["tokenid"].isNull() || metaObj["price"].isNull() || metaObj["timeinforce"].isNull() || metaObj["timeinforce"].get_int() <= 0) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, h.ToString());
     }
 
@@ -2279,7 +2285,7 @@ UniValue postprices(const JSONRPCRequest& request) {
     msg.oracle = DecodeScript(metaObj["oracle"].get_str());
     msg.tokenID.v = metaObj["tokenid"].get_int();
     msg.price = AmountFromValue(metaObj["price"]);
-    msg.timeInForce = metaObj["timeinforce"].get_int() + ::ChainActive().Tip()->height;
+    msg.timeInForce = metaObj["timeinforce"].get_int() + ::ChainActive().Tip()->height + 1;
 
     // encode
     CDataStream markedMetadata(DfTxMarker, SER_NETWORK, PROTOCOL_VERSION);
@@ -2291,7 +2297,11 @@ UniValue postprices(const JSONRPCRequest& request) {
     CMutableTransaction rawTx;
     rawTx.vout.push_back(CTxOut(0, scriptMeta));
 
-    const auto oracleWeight = pcustomcsview->GetOracleWeight(msg.oracle);
+    boost::optional<CAmount> oracleWeight;
+    {
+        LOCK(cs_main);
+        oracleWeight = pcustomcsview->GetOracleWeight(msg.oracle);
+    }
     if (oracleWeight) {
 
         CTxDestination destination;
@@ -2323,8 +2333,8 @@ UniValue priceToJSON(const OracleKey &oracleKey, OracleValue const& val) {
     UniValue oracleObj(UniValue::VOBJ);
     ScriptPubKeyToUniv(oracleKey.oracle, oracleObj, true);
     obj.pushKV("oracle", oracleObj);
-    obj.pushKV("TokenID", (int32_t) oracleKey.tokenID.v);
-    obj.pushKV("price", (int64_t) val.price);
+    obj.pushKV("tokenid", oracleKey.tokenID.ToString());
+    obj.pushKV("price", ValueFromAmount(val.price));
     return obj;
 }
 
@@ -2334,14 +2344,14 @@ UniValue getprice(const JSONRPCRequest& request) {
                {
                        {"oracle", RPCArg::Type::STR, RPCArg::Optional::NO,
                         "CScript of the price oracle transaction"},
-                       {"tokenID", RPCArg::Type::NUM, RPCArg::Optional::NO,
+                       {"tokenid", RPCArg::Type::NUM, RPCArg::Optional::NO,
                         "TokenID, 0 for DeFi"},
                },
                RPCResult{
                        "{...}     (array) Json object with oracle information\n"
                },
                RPCExamples{
-                       HelpExampleCli("getprice", "oracle" "tokenID")
+                       HelpExampleCli("getprice", "oracle" "tokenid")
                },
     }.Check(request);
 
@@ -2349,6 +2359,7 @@ UniValue getprice(const JSONRPCRequest& request) {
     msg.oracle = DecodeScript(request.params[0].get_str());
     msg.tokenID.v = request.params[1].get_int();
 
+    LOCK(cs_main);
     const auto oracleValue = pcustomcsview->GetOraclePrice(msg);
     if (oracleValue) {
         return priceToJSON(msg, *oracleValue);
@@ -2362,11 +2373,8 @@ UniValue listprices(const JSONRPCRequest& request) {
                {
                        {"pagination", RPCArg::Type::OBJ, RPCArg::Optional::OMITTED, "",
                         {
-                                {"start", RPCArg::Type::STR_HEX, RPCArg::Optional::OMITTED,
-                                 "Optional first key to iterate from, in lexicographical order."
-                                 "Typically it's set to last ID from previous request."},
-                                {"tokenID", RPCArg::Type::NUM, RPCArg::Optional::OMITTED,
-                                 "Optional TokenID, 0 by default."},
+                                {"start", RPCArg::Type::NUM, RPCArg::Optional::OMITTED,
+                                 "Optional tokenid, 0 by default."},
                                 {"including_start", RPCArg::Type::BOOL, RPCArg::Optional::OMITTED,
                                  "If true, then iterate including starting position. False by default"},
                                 {"limit", RPCArg::Type::NUM, RPCArg::Optional::OMITTED,
@@ -2379,8 +2387,7 @@ UniValue listprices(const JSONRPCRequest& request) {
                },
                RPCExamples{
                        HelpExampleCli("listprices", "")
-                         + HelpExampleRpc("listprices","'{\"start\":\"34d9dae59f94bf3922a5af934dbfea810c24e6416683301aebb67272675c6109\","
-                                                        "\"tokenID\":\"0\","
+                         + HelpExampleRpc("listprices","'{\"start\":\"0\","
                                                         "\"including_start\":\"1\","
                                                         "\"limit\":\"1000\""
                                                         "}'")
@@ -2389,8 +2396,8 @@ UniValue listprices(const JSONRPCRequest& request) {
 
     // parse pagination
     size_t limit = 100;
-    int tokenID = 0;
-    CScript start = {};
+    int start = 0;
+    CScript startOracle = {};
     {
         if (request.params.size() > 0) {
             bool including_start = false;
@@ -2398,17 +2405,14 @@ UniValue listprices(const JSONRPCRequest& request) {
             if (!paginationObj["limit"].isNull()) {
                 limit = (size_t) paginationObj["limit"].get_int64();
             }
-            if (!paginationObj["tokenID"].isNull()) {
-                tokenID = (int32_t) paginationObj["tokenID"].get_int();
-            }
             if (!paginationObj["start"].isNull()) {
-                start = DecodeScript(paginationObj["start"].get_str());
+                start = (int32_t) paginationObj["start"].get_int();
             }
             if (!paginationObj["including_start"].isNull()) {
                 including_start = paginationObj["including_start"].getBool();
             }
             if (!including_start) {
-                start += CScript(0);
+                startOracle += CScript(0);
             }
         }
         if (limit == 0) {
@@ -2417,9 +2421,10 @@ UniValue listprices(const JSONRPCRequest& request) {
     }
 
     OracleKey startKey{};
-    startKey.oracle = start;
-    startKey.tokenID.v = tokenID;
+    startKey.oracle = startOracle;
+    startKey.tokenID.v = start;
     UniValue ret(UniValue::VARR);
+    LOCK(cs_main);
     pcustomcsview->ForEachPrice([&](OracleKey const& oracleKey, OracleValue const & oracleVal) {
         ret.push_back(priceToJSON(oracleKey, oracleVal));
         limit--;
@@ -2435,10 +2440,12 @@ UniValue listmedianprices(const JSONRPCRequest& request) {
                {
                     {"pagination", RPCArg::Type::OBJ, RPCArg::Optional::OMITTED, "",
                      {
-                             {"tokenID", RPCArg::Type::NUM, RPCArg::Optional::OMITTED,
-                              "Optional TokenID, 0 by default."},
-                             {"limit", RPCArg::Type::NUM, RPCArg::Optional::OMITTED,
-                              "Maximum number of price oracles to return, 100 by default"},
+                            {"start", RPCArg::Type::NUM, RPCArg::Optional::OMITTED,
+                             "Optional tokenid, 0 by default."},
+                            {"including_start", RPCArg::Type::BOOL, RPCArg::Optional::OMITTED,
+                             "If true, then iterate including starting position. False by default"},
+                            {"limit", RPCArg::Type::NUM, RPCArg::Optional::OMITTED,
+                             "Maximum number of price oracles to return, 100 by default"},
                      },
                     },
                },
@@ -2447,7 +2454,8 @@ UniValue listmedianprices(const JSONRPCRequest& request) {
                },
                RPCExamples{
                        HelpExampleCli("listmedianprices", "")
-                         + HelpExampleRpc("listmedianprices","'{\"tokenID\":\"0\","
+                         + HelpExampleRpc("listmedianprices","'{\"start\":\"0\","
+                                                             "\"including_start\":\"1\","
                                                              "\"limit\":\"1000\""
                                                              "}'")
                },
@@ -2462,19 +2470,23 @@ UniValue listmedianprices(const JSONRPCRequest& request) {
         if (!paginationObj["limit"].isNull()) {
             limit = (size_t) paginationObj["limit"].get_int64();
         }
-        if (!paginationObj["tokenID"].isNull()) {
-            startID.v = (int32_t) paginationObj["tokenID"].get_int();
+        if (!paginationObj["start"].isNull()) {
+            startID.v = (int32_t) paginationObj["start"].get_int();
         }
+        if (!paginationObj["including_start"].isNull())
+            if (!paginationObj["including_start"].getBool())
+                startID.v++;
     }
     if (limit == 0) {
         limit = std::numeric_limits<decltype(limit)>::max();
     }
 
     UniValue ret(UniValue::VARR);
+    LOCK(cs_main);
     pcustomcsview->ForEachMedian([&](DCT_ID const& tokenID, CAmount const& medianPrice) {
         UniValue obj(UniValue::VOBJ);
-        obj.pushKV("TokenID", (int32_t) tokenID.v);
-        obj.pushKV("price", (int64_t) medianPrice);
+        obj.pushKV("tokenid", tokenID.ToString());
+        obj.pushKV("price", ValueFromAmount(medianPrice));
         ret.push_back(obj);
         limit--;
         return limit != 0;

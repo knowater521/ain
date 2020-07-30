@@ -525,43 +525,30 @@ bool CCustomCSView::CanSpend(const uint256 & txId, int height) const
 
 void CCustomCSView::CalcMedianPrices(uint32_t height)
 {
-    std::map<DCT_ID, bool> tokenIDSMap;
+    struct priceandcount
+    {
+        CAmount price = 0;
+        int64_t count = 0;
+    };
 
     OracleKey startKey{};
     startKey.tokenID.v = 0;
     startKey.oracle = CScript(0);
 
-    pcustomcsview->ForEachPrice([&](OracleKey const& oracleKey, OracleValue const & oracleVal) {
-        tokenIDSMap[oracleKey.tokenID] = true;
+    std::map<DCT_ID, priceandcount> tokensPricesMap;
+
+    ForEachPrice([&](OracleKey const& oracleKey, OracleValue const & oracleVal) {
+        const auto oracleWeight = GetOracleWeight(oracleKey.oracle);
+        uint32_t curHeightDiff = height - oracleVal.height;
+        if (oracleWeight && (oracleVal.timeInForce > curHeightDiff)) {
+            CAmount currentPrice = (*oracleWeight) * (oracleVal.timeInForce - curHeightDiff) / oracleVal.timeInForce;
+            tokensPricesMap[oracleKey.tokenID].price += currentPrice;
+            tokensPricesMap[oracleKey.tokenID].count++;
+        }
         return true;
     }, startKey);
 
-    for (std::map<DCT_ID, bool>::iterator it = tokenIDSMap.begin(); it != tokenIDSMap.end(); it++) {
-
-        startKey.tokenID = it->first;
-        startKey.oracle = CScript(0);
-
-        std::vector<CAmount> currentPrices;
-        pcustomcsview->ForEachPrice([&](OracleKey const& oracleKey, OracleValue const & oracleVal) {
-            if(oracleKey.tokenID == startKey.tokenID) {
-                const auto oracleWeight = pcustomcsview->GetOracleWeight(oracleKey.oracle);
-                uint32_t curHeightDiff = height - oracleVal.height;
-                if (oracleWeight && (oracleVal.timeInForce >= curHeightDiff)) {
-                    CAmount currentPrice = (*oracleWeight) * (oracleVal.timeInForce - curHeightDiff) / oracleVal.timeInForce;
-                    currentPrices.push_back(currentPrice);
-                }
-            }
-            return oracleKey.tokenID == startKey.tokenID;
-        }, startKey);
-
-        CAmount medianPrice = 0;
-        if(currentPrices.size()){
-            for(unsigned int i = 0; i < currentPrices.size(); i++) {
-                medianPrice += currentPrices[i];
-            }
-            medianPrice /= currentPrices.size();
-
-            pcustomcsview->SetTokenIdMedian(startKey.tokenID, medianPrice);//write In DB tokenID -> medianPrice
-        }
+    for (std::map<DCT_ID, priceandcount>::iterator it = tokensPricesMap.begin(); it != tokensPricesMap.end(); it++) {
+        SetTokenIdMedian(it->first, it->second.price/it->second.count);//write In DB tokenID -> medianPrice
     }
 }
