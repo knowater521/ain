@@ -183,6 +183,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "createtoken", 0, "inputs" },
     { "createtoken", 1, "metadata" },
     { "destroytoken", 0, "inputs" },
+    { "updatetoken", 0, "inputs" },
     { "listtokens", 0, "pagination" },
     { "listtokens", 1, "verbose" },
     { "gettoken", 0, "key" },

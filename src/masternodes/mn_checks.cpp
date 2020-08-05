@@ -138,10 +138,13 @@ Res ApplyCustomTx(CCustomCSView & base_mnview, CCoinsViewCache const & coins, CT
                 res = ApplyResignMasternodeTx(mnview, coins, tx, height, metadata);
                 break;
             case CustomTxType::CreateToken:
-                res = ApplyCreateTokenTx(mnview, tx, height, metadata);
+                res = ApplyCreateTokenTx(mnview, coins, tx, height, metadata);
                 break;
             case CustomTxType::DestroyToken:
                 res = ApplyDestroyTokenTx(mnview, coins, tx, height, metadata);
+                break;
+            case CustomTxType::UpdateToken:
+                res = ApplyUpdateTokenTx(mnview, coins, tx, height, metadata);
                 break;
             case CustomTxType::MintToken:
                 res = ApplyMintTokenTx(mnview, coins, tx, metadata);
@@ -269,7 +272,7 @@ Res ApplyResignMasternodeTx(CCustomCSView & mnview, CCoinsViewCache const & coin
     return Res::Ok(base);
 }
 
-Res ApplyCreateTokenTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata)
+Res ApplyCreateTokenTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata)
 {
     const std::string base{"Token creation"};
     // Check quick conditions first
@@ -294,6 +297,12 @@ Res ApplyCreateTokenTx(CCustomCSView & mnview, CTransaction const & tx, uint32_t
 
     token.creationTx = tx.GetHash();
     token.creationHeight = height;
+
+    //check foundation auth
+    if((token.flags & (uint8_t)CToken::TokenFlags::isDAT) && !HasFoundationAuth(tx, coins, Params().GetConsensus()))
+    {//no need to check Authority if we don't create isDAT
+        return Res::Err("%s: %s", base, "Is not a foundation owner");
+    }
 
     auto res = mnview.CreateToken(token);
     if (!res.ok) {
@@ -323,6 +332,43 @@ Res ApplyDestroyTokenTx(CCustomCSView & mnview, CCoinsViewCache const & coins, C
     auto res = mnview.DestroyToken(token.creationTx, tx.GetHash(), height);
     if (!res.ok) {
         return Res::Err("%s %s: %s", base, token.symbol, res.msg);
+    }
+    return Res::Ok(base);
+}
+
+Res ApplyUpdateTokenTx(CCustomCSView & mnview, CCoinsViewCache const & coins, CTransaction const & tx, uint32_t height, std::vector<unsigned char> const & metadata)
+{
+    const std::string base{"Token update"};
+
+    uint256 tokenTx;
+    bool isDAT;
+    CDataStream ss(metadata, SER_NETWORK, PROTOCOL_VERSION);
+    ss >> tokenTx;
+    ss >> isDAT;
+    if (!ss.empty()) {
+        return Res::Err("Token Update: deserialization failed: excess %d bytes", ss.size());
+    }
+
+    auto pair = mnview.GetTokenByCreationTx(tokenTx);
+    if (!pair) {
+        return Res::Err("%s: token with creationTx %s does not exist", base, tokenTx.ToString());
+    }
+    CTokenImplementation const & token = pair->second;
+    if (!HasCollateralAuth(tx, coins, token.creationTx)) {
+        return Res::Err("%s: %s", base, "tx must have at least one input from token owner");
+    }
+
+    //check foundation auth
+    if (!HasFoundationAuth(tx, coins, Params().GetConsensus())) {
+        return Res::Err("%s: %s", base, "Is not a foundation owner");
+    }
+
+    if((token.flags & (uint8_t)CToken::TokenFlags::isDAT) != isDAT && pair->first.v >= 128)
+    {
+        auto res = mnview.UpdateToken(token.creationTx);
+        if (!res.ok) {
+            return Res::Err("%s %s: %s", base, token.symbol, res.msg);
+        }
     }
     return Res::Ok(base);
 }
