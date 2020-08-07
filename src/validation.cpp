@@ -1906,6 +1906,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
     if (block.GetHash() == chainparams.GetConsensus().hashGenesisBlock) {
         if (!fJustCheck) {
             view.SetBestBlock(pindex->GetBlockHash());
+            pcustomcsview->CreateDFIToken();
             // init view|db with genesis here
             for (size_t i = 0; i < block.vtx.size(); ++i) {
                 ApplyCustomTx(mnview, view, *block.vtx[i], chainparams.GetConsensus(), pindex->nHeight, fJustCheck);
@@ -2311,7 +2312,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
         CCustomCSView cache(mnview);
 
         cache.DismissExpiredOrders(pindex->nHeight);
-
+        cache.DeleteExpiredPrices(pindex->nHeight);
 
         // construct undo
         auto& flushable = dynamic_cast<CFlushableStorageKV&>(cache.GetRaw());

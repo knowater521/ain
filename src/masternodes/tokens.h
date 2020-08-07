@@ -102,25 +102,6 @@ public:
     }
 };
 
-//class CStableTokens {
-//    CStableTokens() = default;
-//    ~CStableTokens() = default;
-//    CStableTokens(CStableTokens const &) = delete;
-//    CStableTokens& operator=(CStableTokens const &) = delete;
-
-//    static void Initialize(CStableTokens & dst);
-
-//    std::map<DCT_ID, CToken> tokens;
-//    std::map<std::string, DCT_ID> indexedBySymbol;
-
-//public:
-//    static CStableTokens const & Instance();
-//    std::unique_ptr<CToken> GetToken(DCT_ID id) const;
-//    boost::optional<std::pair<DCT_ID, std::unique_ptr<CToken>>> GetToken(std::string const & symbol) const;
-//    bool ForEach(std::function<bool(DCT_ID const & id, CToken const & token)> callback, DCT_ID const & start) const;
-//};
-
-
 class CTokensView : public virtual CStorageView
 {
 public:
@@ -136,6 +117,7 @@ public:
 
     void ForEachToken(std::function<bool(DCT_ID const & id, CToken const & token)> callback, DCT_ID const & start = DCT_ID{0});
 
+    Res CreateDFIToken();
     Res CreateToken(CTokenImpl const & token);
     bool RevertCreateToken(uint256 const & txid);
     Res UpdateToken(uint256 const & tokenTx);

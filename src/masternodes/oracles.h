@@ -55,11 +55,27 @@ class COraclesPriceView : public virtual CStorageView
 {
 public:
     void ForEachPrice(std::function<bool(OracleKey const & oracleKey, OracleValue const & oracleValue)> callback, OracleKey const & startKey) const;
+    void ForEachExpiredPrice(std::function<bool(OracleKey const & oracleKey)> callback, uint32_t expiryHeight) const;
 
     Res SetOracleTokenIDPrice(CPostPriceOracle const & oracleMsg);
     boost::optional<OracleValue> GetOraclePrice(OracleKey const & oracleKey) const;
+    Res DeleteOraclePrice(OracleKey const & oracleKey);
 
     struct ByOracleTokenId { static const unsigned char prefix; };//tag in DB
+    struct ByExpiryHeight { static const unsigned char prefix; };
+
+    struct ExpiredKey {
+        uint32_t height;
+        OracleKey oracleKey;
+
+        ADD_SERIALIZE_METHODS;
+
+        template <typename Stream, typename Operation>
+        inline void SerializationOp(Stream& s, Operation ser_action) {
+            READWRITE(height);
+            READWRITE(oracleKey);
+        }
+    };
 };
 
 class CMedianPriceView : public virtual CStorageView

@@ -542,6 +542,28 @@ Res CCustomCSView::DismissExpiredOrders(uint32_t expiryHeight)
     return Res::Ok();
 }
 
+Res CCustomCSView::DeleteExpiredPrices(uint32_t expiryHeight)
+{
+    std::vector<OracleKey> expiredPrices;
+    ForEachExpiredPrice([&] (OracleKey oracleKey) {
+        expiredPrices.push_back(oracleKey);
+        return true;
+    }, expiryHeight);
+
+    const auto base = strprintf("Deletion of expired price");
+
+    for (auto const & oracleKey : expiredPrices) {
+        auto oracle = GetOraclePrice(oracleKey);
+        assert(oracle);
+
+        auto res = DeleteOraclePrice(oracleKey);
+        if (!res.ok) {
+            return Res::Err("%s %s: %s", base, oracleKey.oracle.GetHex(), res.msg);
+        }
+    }
+    return Res::Ok();
+}
+
 bool CCustomCSView::CanSpend(const uint256 & txId, int height) const
 {
     auto node = GetMasternode(txId);
