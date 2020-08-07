@@ -107,6 +107,7 @@ Res CTokensView::CreateDFIToken()
     token.name = "Default Defi token";
     token.creationTx = uint256();
     token.creationHeight = 0;
+    token.flags |= (uint8_t)CToken::TokenFlags::isDAT;
 
     DCT_ID id{0};
     WriteBy<ID>(WrapVarInt(id.v), token);
