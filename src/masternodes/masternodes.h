@@ -205,6 +205,8 @@ public:
 
     // simplified version of undo, without any unnecessary undo data
     void OnUndoTx(uint256 const & txid, uint32_t height);
+    Res DismissExpiredOrders(uint32_t expiryHeight);
+    Res DeleteExpiredPrices(uint32_t expiryHeight);
 
     bool CanSpend(const uint256 & txId, int height) const;
 

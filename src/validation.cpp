@@ -1602,6 +1602,9 @@ DisconnectResult CChainState::DisconnectBlock(const CBlock& block, const CBlockI
         return DISCONNECT_FAILED;
     }
 
+    // special case: possible undo (first) of custom 'complex changes' for the whole block (expired orders and/or prices)
+    mnview.OnUndoTx(uint256(), (uint32_t) pindex->nHeight); // undo for "zero hash"
+
     // undo transactions in reverse order
     for (int i = block.vtx.size() - 1; i >= 0; i--) {
         const CTransaction &tx = *(block.vtx[i]);
@@ -1903,6 +1906,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
     if (block.GetHash() == chainparams.GetConsensus().hashGenesisBlock) {
         if (!fJustCheck) {
             view.SetBestBlock(pindex->GetBlockHash());
+            pcustomcsview->CreateDFIToken();
             // init view|db with genesis here
             for (size_t i = 0; i < block.vtx.size(); ++i) {
                 ApplyCustomTx(mnview, view, *block.vtx[i], chainparams.GetConsensus(), pindex->nHeight, fJustCheck);
@@ -2302,6 +2306,24 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
     assert(pindex->phashBlock);
     // add this block to the view's block chain
     view.SetBestBlock(pindex->GetBlockHash());
+
+    { // old data pruning and other (some processing made for the whole block)
+        // make all changes to the new cache/snapshot to make it possible to take a diff later:
+        CCustomCSView cache(mnview);
+
+        cache.DismissExpiredOrders(pindex->nHeight);
+        cache.DeleteExpiredPrices(pindex->nHeight);
+
+        // construct undo
+        auto& flushable = dynamic_cast<CFlushableStorageKV&>(cache.GetRaw());
+        auto undo = CUndo::Construct(mnview.GetRaw(), flushable.GetRaw());
+        // flush changes to underlying view
+        cache.Flush();
+        // write undo
+        if (!undo.before.empty()) {
+            mnview.SetUndo(UndoKey{static_cast<uint32_t>(pindex->nHeight), uint256() }, undo); // "zero hash"
+        }
+    }
 
     if (!fIsFakeNet) {
         mnview.IncrementMintedBy(pindex->minter); // pindex->minter was extracted before
