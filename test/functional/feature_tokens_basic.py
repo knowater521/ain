@@ -156,7 +156,7 @@ class TokensBasicTest (DefiTestFramework):
         # Revert creation!
         self.start_node(2)
 
-        self.nodes[2].generate(8)
+        self.nodes[2].generate(50)
         connect_nodes_bi(self.nodes, 0, 2)
         self.sync_blocks(self.nodes[0:3])
         assert_equal(len(self.nodes[0].listtokens()), 1)
