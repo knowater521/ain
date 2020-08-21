@@ -146,10 +146,10 @@ class TokensBasicTest (DefiTestFramework):
         print ("Reverting...")
         # Reverting creation!
         self.start_node(3)
-        self.nodes[3].generate(30)
+        self.nodes[3].generate(20)
 
         connect_nodes_bi(self.nodes, 0, 3)
-        self.sync_blocks(self.nodes[0:3])
+        self.sync_blocks()
         assert_equal(len(self.nodes[0].listtokens()), 1)
 
 if __name__ == '__main__':
