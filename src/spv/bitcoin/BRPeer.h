@@ -27,8 +27,8 @@
 
 #include "BRTransaction.h"
 #include "BRMerkleBlock.h"
-#include "BRAddress.h"
-#include "BRInt.h"
+#include <spv/support/BRAddress.h>
+#include <spv/support/BRInt.h>
 #include <stddef.h>
 #include <inttypes.h>
 #include <boost/thread.hpp>

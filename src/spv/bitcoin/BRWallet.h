@@ -26,9 +26,9 @@
 #define BRWallet_h
 
 #include "BRTransaction.h"
-#include "BRAddress.h"
-#include "BRBIP32Sequence.h"
-#include "BRInt.h"
+#include <spv/support/BRAddress.h>
+#include <spv/support/BRBIP32Sequence.h>
+#include <spv/support/BRInt.h>
 #include <string.h>
 
 #ifdef __cplusplus

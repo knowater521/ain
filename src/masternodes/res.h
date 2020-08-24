@@ -13,6 +13,9 @@ struct Res
 
     Res() = delete;
 
+    Res(bool in_ok, std::string in_msg, uint32_t in_code) :
+        ok(in_ok), msg(in_msg), code(in_code) {}
+
     template<typename... Args>
     static Res Err(std::string const & err, const Args&... args) {
         return Res{false, tfm::format(err, args...), 0};

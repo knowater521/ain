@@ -25,7 +25,7 @@
 #ifndef BRMerkleBlock_h
 #define BRMerkleBlock_h
 
-#include "BRLargeInt.h"
+#include <spv/support/BRLargeInt.h>
 #include <stddef.h>
 #include <inttypes.h>
 

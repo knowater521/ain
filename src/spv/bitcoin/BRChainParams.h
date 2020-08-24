@@ -26,7 +26,7 @@
 #define BRChainParams_h
 
 #include "BRMerkleBlock.h"
-#include "BRSet.h"
+#include <spv/support/BRSet.h>
 #include "BRPeer.h"
 #include <assert.h>
 

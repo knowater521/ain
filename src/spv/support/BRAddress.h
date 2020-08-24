@@ -76,7 +76,7 @@ typedef struct {
     char s[75];
 } BRAddress;
 
-#define BR_ADDRESS_NONE ((const BRAddress) {\
+#define BR_ADDRESS_NONE (const BRAddress {\
     "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"\
     "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0" })
 

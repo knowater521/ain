@@ -877,7 +877,7 @@ bool IsAnchorTx(BRTransaction *tx, CAnchor & anchor)
     }
     try {
         ss >> anchor;
-    } catch (std::ios_base::failure const & e) {
+    } catch (std::ios_base::failure const & /*e*/) {
         LogPrintf("spv: can't deserialize anchor from tx %s\n", to_uint256(tx->txHash).ToString());
         return false;
     }

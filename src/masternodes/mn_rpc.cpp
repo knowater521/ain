@@ -30,7 +30,7 @@
 #include <stdexcept>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/assign/list_of.hpp>
+//#include <boost/assign/list_of.hpp>
 #include <rpc/rawtransaction_util.h>
 
 extern UniValue createrawtransaction(UniValue const& params, bool fHelp); // in rawtransaction.cpp
@@ -637,7 +637,7 @@ UniValue createtoken(const JSONRPCRequest& request) {
                 try {
                     rawTx.vin = GetAuthInputs(pwallet, destination, request.params[0].get_array());
                 }
-                catch (const UniValue& objError) {}
+                catch (const UniValue& /*objError*/) {}
             }
         }
         if(rawTx.vin.size() == 0)
@@ -834,7 +834,7 @@ UniValue updatetoken(const JSONRPCRequest& request) {
             try {
                 rawTx.vin = GetAuthInputs(pwallet, destination, request.params[0].get_array());
             }
-            catch (const UniValue& objError) {}
+            catch (const UniValue& /*objError*/) {}
         }
     }
     if(rawTx.vin.size() == 0)
