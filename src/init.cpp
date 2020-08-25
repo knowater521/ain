@@ -249,10 +249,15 @@ void Shutdown(InitInterfaces& interfaces)
     // may not have been initialized yet.
     {
         LOCK(cs_main);
-        const auto canFlush = g_chainstate->CanFlushToDisk();
-        LogPrintf("%s: g_chainstate->CanFlushToDisk() is %d\n", __func__, static_cast<int>(canFlush));
-        if (g_chainstate && g_chainstate->CanFlushToDisk()) {
-            g_chainstate->ForceFlushStateToDisk();
+        if (g_chainstate) {
+            const auto canFlush = g_chainstate->CanFlushToDisk();
+            LogPrintf("%s: g_chainstate->CanFlushToDisk() is %d\n", __func__, static_cast<int>(canFlush));
+            if (g_chainstate->CanFlushToDisk()) {
+                g_chainstate->ForceFlushStateToDisk();
+            }
+        }
+        else {
+            LogPrintf("%s: g_chainstate is null\n", __func__);
         }
     }
 
