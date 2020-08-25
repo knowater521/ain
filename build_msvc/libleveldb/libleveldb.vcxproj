@@ -7,6 +7,9 @@
   <PropertyGroup Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
   </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\leveldb\db\builder.cc" />
     <ClCompile Include="..\..\src\leveldb\db\c.cc" />
@@ -52,10 +55,10 @@
   </ItemGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-	 <PreprocessorDefinitions>_CRT_NONSTDC_NO_DEPRECATE;LEVELDB_PLATFORM_WINDOWS;LEVELDB_ATOMIC_PRESENT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-	 <DisableSpecificWarnings>4244;4267;4312;</DisableSpecificWarnings>
-	 <AdditionalIncludeDirectories>..\..\src\leveldb;..\..\src\leveldb\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-	</ClCompile>
+      <PreprocessorDefinitions>_CRT_NONSTDC_NO_DEPRECATE;LEVELDB_PLATFORM_WINDOWS;LEVELDB_ATOMIC_PRESENT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4244;4267;4312;</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>..\..\src\leveldb;..\..\src\leveldb\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

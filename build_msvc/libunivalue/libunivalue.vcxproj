@@ -7,6 +7,9 @@
   <PropertyGroup Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
   </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\univalue\lib\univalue.cpp" />
     <ClCompile Include="..\..\src\univalue\lib\univalue_get.cpp" />
