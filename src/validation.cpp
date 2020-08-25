@@ -2414,6 +2414,7 @@ bool CChainState::FlushStateToDisk(
                     vBlocks.push_back(*it);
                     setDirtyBlockIndex.erase(it++);
                 }
+                LogPrintf("%s: before WriteBatchSync\n", __func__);
                 if (!pblocktree->WriteBatchSync(vFiles, nLastBlockFile, vBlocks)) {
                     return AbortNode(state, "Failed to write to block index database");
                 }

@@ -249,6 +249,7 @@ void Shutdown(InitInterfaces& interfaces)
     // may not have been initialized yet.
     {
         LOCK(cs_main);
+        LogPrintf("%s: g_chainstate->CanFlushToDisk() is %d\n", __func__, g_chainstate->CanFlushToDisk());
         if (g_chainstate && g_chainstate->CanFlushToDisk()) {
             g_chainstate->ForceFlushStateToDisk();
         }
