@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\common.init.vcxproj" />
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{2df6b6c0-94bd-4030-b195-f09207297943}</ProjectGuid>
+    <RootNamespace>libdefimasternode</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\masternodes\accounts.cpp" />
+    <ClCompile Include="..\..\src\masternodes\anchors.cpp" />
+    <ClCompile Include="..\..\src\masternodes\criminals.cpp" />
+    <ClCompile Include="..\..\src\masternodes\masternodes.cpp" />
+    <ClCompile Include="..\..\src\masternodes\mn_checks.cpp" />
+    <ClCompile Include="..\..\src\masternodes\mn_rpc.cpp" />
+    <ClCompile Include="..\..\src\masternodes\tokens.cpp" />
+    <ClCompile Include="..\..\src\masternodes\undos.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\masternodes\accounts.h" />
+    <ClInclude Include="..\..\src\masternodes\anchors.h" />
+    <ClInclude Include="..\..\src\masternodes\balances.h" />
+    <ClInclude Include="..\..\src\masternodes\criminals.h" />
+    <ClInclude Include="..\..\src\masternodes\masternodes.h" />
+    <ClInclude Include="..\..\src\masternodes\mn_checks.h" />
+    <ClInclude Include="..\..\src\masternodes\res.h" />
+    <ClInclude Include="..\..\src\masternodes\tokens.h" />
+    <ClInclude Include="..\..\src\masternodes\undo.h" />
+    <ClInclude Include="..\..\src\masternodes\undos.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="..\common.vcxproj" />
+</Project>

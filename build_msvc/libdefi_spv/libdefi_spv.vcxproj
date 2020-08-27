@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\common.init.vcxproj" />
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{59973240-5afd-4c34-860b-57cb5a4aba5a}</ProjectGuid>
+    <RootNamespace>libdefispv</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <PlatformToolset>llvm</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\spv\btctransaction.cpp" />
+    <ClCompile Include="..\..\src\spv\spv_rpc.cpp" />
+    <ClCompile Include="..\..\src\spv\spv_wrapper.cpp" />
+    <ClCompile Include="..\..\src\spv\support\BRAddress.cpp" />
+    <ClCompile Include="..\..\src\spv\support\BRBase58.cpp" />
+    <ClCompile Include="..\..\src\spv\support\BRBech32.cpp" />
+    <ClCompile Include="..\..\src\spv\support\BRBIP32Sequence.cpp" />
+    <ClCompile Include="..\..\src\spv\support\BRBIP39Mnemonic.cpp" />
+    <ClCompile Include="..\..\src\spv\support\BRCrypto.cpp" />
+    <ClCompile Include="..\..\src\spv\support\BRKey.cpp" />
+    <ClCompile Include="..\..\src\spv\support\BRKeyECIES.cpp" />
+    <ClCompile Include="..\..\src\spv\support\BRSet.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\spv\btctransaction.h" />
+    <ClInclude Include="..\..\src\spv\spv_wrapper.h" />
+    <ClInclude Include="..\..\src\spv\support\BRAddress.h" />
+    <ClInclude Include="..\..\src\spv\support\BRArray.h" />
+    <ClInclude Include="..\..\src\spv\support\BRBase58.h" />
+    <ClInclude Include="..\..\src\spv\support\BRBech32.h" />
+    <ClInclude Include="..\..\src\spv\support\BRBIP32Sequence.h" />
+    <ClInclude Include="..\..\src\spv\support\BRBIP39Mnemonic.h" />
+    <ClInclude Include="..\..\src\spv\support\BRBIP39WordsEn.h" />
+    <ClInclude Include="..\..\src\spv\support\BRCrypto.h" />
+    <ClInclude Include="..\..\src\spv\support\BRInt.h" />
+    <ClInclude Include="..\..\src\spv\support\BRKey.h" />
+    <ClInclude Include="..\..\src\spv\support\BRKeyECIES.h" />
+    <ClInclude Include="..\..\src\spv\support\BRLargeInt.h" />
+    <ClInclude Include="..\..\src\spv\support\BRSet.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="..\common.vcxproj" />
+</Project>
