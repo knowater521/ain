@@ -70,6 +70,9 @@ struct Params {
      * BIP 16 exception blocks. */
     int SegwitHeight;
 
+    /** Block height at which tokenization becomes active */
+    int TokenHeight;
+
     /** Proof of stake parameters */
     struct PoS {
         uint256 diffLimit;
