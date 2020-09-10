@@ -41,6 +41,24 @@ jobs:
         repository: defi/defichain
         tags: latest,${{ env.BUILD_VERSION }}
 
+  ubuntu16:
+    runs-on: ubuntu-16.04
+    env:
+      BUILD_VERSION: latest # Computed
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Build and package
+      run: TARGETS="x86_64-pc-ubuntu16.04-gnu" ./make.sh docker-release-git
+
+    - name: Publish artifacts
+      uses: actions/upload-artifact@v2-preview
+      with:
+        name: defichain-${{ env.BUILD_VERSION }}-x86_64-pc-ubuntu16.04-gnu
+        path: ./build/defichain-${{ env.BUILD_VERSION }}-x86_64-pc-ubuntu16.04-gnu.tar.gz
+
   windows:
     runs-on: ubuntu-18.04
     env:
@@ -126,6 +144,16 @@ jobs:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./defichain-${{ env.BUILD_VERSION }}-x86_64-pc-linux-gnu/defichain-${{ env.BUILD_VERSION }}-x86_64-pc-linux-gnu.tar.gz
         asset_name: defichain-${{ env.BUILD_VERSION }}-x86_64-pc-linux-gnu.tar.gz
+        asset_content_type: application/gzip
+
+    - name: Upload release asset - ubuntu16
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./defichain-${{ env.BUILD_VERSION }}-x86_64-pc-ubuntu16.04-gnu/defichain-${{ env.BUILD_VERSION }}-x86_64-pc-ubuntu16.04-gnu.tar.gz
+        asset_name: defichain-${{ env.BUILD_VERSION }}-x86_64-pc-ubuntu16.04-gnu.tar.gz
         asset_content_type: application/gzip
 
     - name: Upload release asset - windows
