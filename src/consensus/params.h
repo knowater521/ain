@@ -83,6 +83,15 @@ struct Params {
      *  baseBlockSubsidy * anchorRewardPertentage / 100 */
     float anchorRewardPertentage;
 
+    /** Block height at which DFIP2 becomes active */
+    int DFIP2Height;
+
+    /** The address for DeFi incentive funding smart contract */
+    CScript incentiveFundScript;
+
+    /** The DeFi incentive fundingpercentage in DFIP2 */
+    float incentiveFundPercentage;
+
     /** Proof of stake parameters */
     struct PoS {
         uint256 diffLimit;

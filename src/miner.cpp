@@ -240,8 +240,39 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     coinbaseTx.vout[0].scriptPubKey = scriptPubKeyIn;
     const auto nTotalRewards = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
     coinbaseTx.vout[0].nValue = nTotalRewards;
+    
+    if (nHeight >= chainparams.GetConsensus().DFIP2Height)
+    {
+        // Implement DFIP2 here
+        CAmount foundationsReward = nTotalRewards * chainparams.GetConsensus().foundationSharePercentageDFIP1 / 100;
+        if (!chainparams.GetConsensus().foundationShareScript.empty() && foundationsReward != 0) {
+            if (pcustomcsview->GetFoundationsDebt() < foundationsReward) {
+                coinbaseTx.vout.resize(2);
+                coinbaseTx.vout[1].scriptPubKey = chainparams.GetConsensus().foundationShareScript;
+                coinbaseTx.vout[1].nValue = foundationsReward - pcustomcsview->GetFoundationsDebt();
+                coinbaseTx.vout[0].nValue -= coinbaseTx.vout[1].nValue;
+            } else {
+                pcustomcsview->SetFoundationsDebt(pcustomcsview->GetFoundationsDebt() - foundationsReward);
+            }
+        }
 
-    if (nHeight >= chainparams.GetConsensus().DFIP1Height)
+        const CAmount anchorReward = nTotalRewards * chainparams.GetConsensus().anchorRewardPertentage / 100;
+        if (!chainparams.GetConsensus().anchorRewardScript.empty() && anchorReward != 0) {
+            coinbaseTx.vout.resize(coinbaseTx.vout.size() + 1);
+            coinbaseTx.vout.back().scriptPubKey = chainparams.GetConsensus().anchorRewardScript;
+            coinbaseTx.vout.back().nValue = anchorReward;
+            coinbaseTx.vout[0].nValue -= coinbaseTx.vout.back().nValue;
+        }
+
+        const CAmount incentiveFund = nTotalRewards * chainparams.GetConsensus().incentiveFundPercentage / 100;
+        if (!chainparams.GetConsensus().incentiveFundScript.empty() && incentiveFund != 0) {
+            coinbaseTx.vout.resize(coinbaseTx.vout.size() + 1);
+            coinbaseTx.vout.back().scriptPubKey = chainparams.GetConsensus().incentiveFundScript;
+            coinbaseTx.vout.back().nValue = incentiveFund;
+            coinbaseTx.vout[0].nValue -= coinbaseTx.vout.back().nValue;
+        }
+    }
+    else if (nHeight >= chainparams.GetConsensus().DFIP1Height)
     {
         // Implement DFIPS1 here, using foundationSharePercentageDFIP1 instead of
         CAmount foundationsReward = nTotalRewards * chainparams.GetConsensus().foundationSharePercentageDFIP1 / 100;

@@ -193,6 +193,9 @@ public:
         consensus.foundationSharePercentageDFIP1 = 9.95; // Change from 10% to 9.95%
         consensus.anchorRewardPertentage = 0.05;   // 0.05%, If block reward is 200, anchor reward 0.1
 
+        consensus.DFIP2Height = 400000;
+        consensus.incentiveFundPercentage = 22.5; // 22.5%, If block reward is 200, incentive fund reward 45
+
         // owner base58, operator base58
         vMasternodes.push_back({"8PuErAcazqccCVzRcc8vJ3wFaZGm4vFbLe", "8J846CKFF83Jcj5m4EReJmxiaJ6Jy1Y6Ea"});
         vMasternodes.push_back({"8RPZm7SVUNhGN1RgGY3R92rvRkZBwETrCX", "8bzHwhaF2MaVs4owRvpWtZQVug3mKuJji2"});
@@ -337,6 +340,9 @@ public:
         consensus.foundationSharePercentageDFIP1 = 9.95; // Change from 10% to 9.95%
         consensus.anchorRewardPertentage = 0.05;   // 0.05%, If block reward is 200, anchor reward 0.1
 
+        consensus.DFIP2Height = 400000;
+        consensus.incentiveFundPercentage = 22.5; // 22.5%, If block reward is 200, incentive fund reward 45
+
         // owner base58, operator base58
         vMasternodes.push_back({"7LMorkhKTDjbES6DfRxX2RiNMbeemUkxmp", "7KEu9JMKCx6aJ9wyg138W3p42rjg19DR5D"});
         vMasternodes.push_back({"7E8Cjn9cqEwnrc3E4zN6c5xKxDSGAyiVUM", "78MWNEcAAJxihddCw1UnZD8T7fMWmUuBro"});
@@ -461,6 +467,9 @@ public:
         consensus.DFIP1Height = 300000;
         consensus.foundationSharePercentageDFIP1 = 9.95; // Change from 10% to 9.95%
         consensus.anchorRewardPertentage = 0.05;   // 0.05%, If block reward is 200, anchor reward 0.1
+
+        consensus.DFIP2Height = 400000;
+        consensus.incentiveFundPercentage = 22.5; // 22.5%, If block reward is 200, incentive fund reward 45
 
         // now it is for devnet and regtest only, 2 first of genesis MNs acts as foundation members
         consensus.foundationMembers.emplace(GetScriptForDestination(DecodeDestination("7M3g9CSERjLdXisE5pv2qryDbURUj9Vpi1", *this)));
@@ -594,6 +603,9 @@ public:
         consensus.DFIP1Height = 300000;
         consensus.foundationSharePercentageDFIP1 = 9.95; // Change from 10% to 9.95%
         consensus.anchorRewardPertentage = 0.05;   // 0.05%, If block reward is 200, anchor reward 0.1
+
+        consensus.DFIP2Height = 400000;
+        consensus.incentiveFundPercentage = 22.5; // 22.5%, If block reward is 200, incentive fund reward 45
 
         // now it is for devnet and regtest only, 2 first and 2 last of genesis MNs acts as foundation members
         consensus.foundationMembers.emplace(GetScriptForDestination(DecodeDestination("mwsZw8nF7pKxWH8eoKL9tPxTpaFkz7QeLU", *this)));
